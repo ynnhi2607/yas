@@ -1,0 +1,21 @@
+name: CD Dev
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-dev:
+    runs-on: self-hosted
+
+    steps:
+      - name: Deploy tax-service to dev
+        run: |
+          COMMIT_ID=$(echo $GITHUB_SHA | cut -c1-7)
+
+          kubectl set image deployment/tax-service \
+            tax-service=ynnhi2607/yas-tax:$COMMIT_ID \
+            -n yas-dev
+
+          kubectl rollout status deployment/tax-service -n yas-dev
