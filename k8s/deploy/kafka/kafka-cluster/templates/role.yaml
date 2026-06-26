@@ -1,3 +1,4 @@
+{{- if .Values.debeziumConnect.enabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -7,3 +8,4 @@ rules:
     resources: ["secrets"]
     resourceNames: ["postgresql.credentials"]
     verbs: ["get", "watch", "list"]
+{{- end }}

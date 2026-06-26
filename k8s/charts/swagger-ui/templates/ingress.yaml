@@ -49,12 +49,12 @@ spec:
             backend:
               {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
               service:
-                name: {{ $fullName }}
+                name: {{ default $fullName .serviceName }}
                 port:
-                  number: {{ $svcPort }}
+                  number: {{ default $svcPort .servicePort }}
               {{- else }}
-              serviceName: {{ $fullName }}
-              servicePort: {{ $svcPort }}
+              serviceName: {{ default $fullName .serviceName }}
+              servicePort: {{ default $svcPort .servicePort }}
               {{- end }}
           {{- end }}
     {{- end }}

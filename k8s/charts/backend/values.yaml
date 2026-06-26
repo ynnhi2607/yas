@@ -28,6 +28,8 @@ podAnnotations: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
+hostAliases: []
+
 securityContext: {}
   # capabilities:
   #   drop:
@@ -87,6 +89,14 @@ lifecycle:
       command: ["sh", "-c", "sleep 10"]
 
 terminationGracePeriodSeconds: 45
+
+startupProbe:
+  periodSeconds: 10
+  failureThreshold: 60
+  successThreshold: 1
+  httpGet:
+    path: /actuator/health/liveness
+    port: metric
 
 livenessProbe:
   periodSeconds: 10

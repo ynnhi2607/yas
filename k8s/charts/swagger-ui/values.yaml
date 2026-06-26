@@ -8,7 +8,7 @@ image:
   repository: swaggerapi/swagger-ui
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v4.16.0"
+  tag: "v5.17.14"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -39,16 +39,12 @@ securityContext: {}
 baseUrl: /swagger-ui
 urls: "[{ url: 'http://api.yas.local.com/product/v3/api-docs', name: 'Product' },
       { url: 'http://api.yas.local.com/media/v3/api-docs', name: 'Media' },
-      { url: 'http://api.yas.local.com/customer/v3/api-docs', name: 'Customer' }, 
-      { url: 'http://api.yas.local.com/cart/v3/api-docs', name: 'Cart'},
-      { url: 'http://api.yas.local.com/rating/v3/api-docs', name: 'Rating' }, 
-      { url: 'http://api.yas.local.com/order/v3/api-docs', name: 'Order'},
-      { url: 'http://api.yas.local.com/payment/v3/api-docs', name: 'Payment'},
-      { url: 'http://api.yas.local.com/location/v3/api-docs', name: 'Location'}, 
-      { url: 'http://api.yas.local.com/inventory/v3/api-docs', name: 'Inventory'},
+      { url: 'http://api.yas.local.com/customer/v3/api-docs', name: 'Customer' },
+      { url: 'http://api.yas.local.com/cart/v3/api-docs', name: 'Cart' },
+      { url: 'http://api.yas.local.com/order/v3/api-docs', name: 'Order' },
+      { url: 'http://api.yas.local.com/inventory/v3/api-docs', name: 'Inventory' },
       { url: 'http://api.yas.local.com/tax/v3/api-docs', name: 'Tax' },
-      { url: 'http://api.yas.local.com/promotion/v3/api-docs', name: 'Promotion'},
-      { url: 'http://api.yas.local.com/search/v3/api-docs', name: 'Search'}]"
+      { url: 'http://api.yas.local.com/search/v3/api-docs', name: 'Search' }]"
 
 service:
   type: ClusterIP
@@ -66,6 +62,38 @@ ingress:
       paths:
         - path: /swagger-ui
           pathType: ImplementationSpecific
+        - path: /product
+          pathType: Prefix
+          serviceName: product
+          servicePort: 80
+        - path: /media
+          pathType: Prefix
+          serviceName: media
+          servicePort: 80
+        - path: /customer
+          pathType: Prefix
+          serviceName: customer
+          servicePort: 80
+        - path: /cart
+          pathType: Prefix
+          serviceName: cart
+          servicePort: 80
+        - path: /order
+          pathType: Prefix
+          serviceName: order
+          servicePort: 80
+        - path: /inventory
+          pathType: Prefix
+          serviceName: inventory
+          servicePort: 80
+        - path: /tax
+          pathType: Prefix
+          serviceName: tax
+          servicePort: 80
+        - path: /search
+          pathType: Prefix
+          serviceName: search
+          servicePort: 80
   tls: []
   #  - secretName: chart-example-tls
   #    hosts:

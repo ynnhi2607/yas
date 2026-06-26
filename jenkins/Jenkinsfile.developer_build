@@ -1,0 +1,56 @@
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'NAMESPACE', defaultValue: 'yas', description: 'Kubernetes namespace to deploy to')
+    string(name: 'DOCKERHUB_USERNAME', defaultValue: 'ynnhi2607', description: 'Docker Hub username/org')
+    booleanParam(name: 'DEPLOY_SAMPLEDATA', defaultValue: false, description: 'Run sampledata once when seeding demo data')
+
+    string(name: 'PRODUCT_BRANCH', defaultValue: 'main', description: 'Branch or commit for product')
+    string(name: 'CART_BRANCH', defaultValue: 'main', description: 'Branch or commit for cart')
+    string(name: 'ORDER_BRANCH', defaultValue: 'main', description: 'Branch or commit for order')
+    string(name: 'CUSTOMER_BRANCH', defaultValue: 'main', description: 'Branch or commit for customer')
+    string(name: 'INVENTORY_BRANCH', defaultValue: 'main', description: 'Branch or commit for inventory')
+    string(name: 'TAX_BRANCH', defaultValue: 'main', description: 'Branch or commit for tax')
+    string(name: 'MEDIA_BRANCH', defaultValue: 'main', description: 'Branch or commit for media')
+    string(name: 'SEARCH_BRANCH', defaultValue: 'main', description: 'Branch or commit for search')
+    string(name: 'STOREFRONT_BFF_BRANCH', defaultValue: 'main', description: 'Branch or commit for storefront-bff')
+    string(name: 'BACKOFFICE_BFF_BRANCH', defaultValue: 'main', description: 'Branch or commit for backoffice-bff')
+    string(name: 'STOREFRONT_UI_BRANCH', defaultValue: 'main', description: 'Branch or commit for storefront-ui')
+    string(name: 'BACKOFFICE_UI_BRANCH', defaultValue: 'main', description: 'Branch or commit for backoffice-ui')
+    string(name: 'SAMPLEDATA_BRANCH', defaultValue: 'main', description: 'Branch or commit for sampledata')
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Deploy developer build') {
+      steps {
+        sh '''
+          chmod +x scripts/cd/developer_build.sh
+          NAMESPACE="${NAMESPACE}" \
+          DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME}" \
+          DEPLOY_SAMPLEDATA="${DEPLOY_SAMPLEDATA}" \
+          PRODUCT_BRANCH="${PRODUCT_BRANCH}" \
+          CART_BRANCH="${CART_BRANCH}" \
+          ORDER_BRANCH="${ORDER_BRANCH}" \
+          CUSTOMER_BRANCH="${CUSTOMER_BRANCH}" \
+          INVENTORY_BRANCH="${INVENTORY_BRANCH}" \
+          TAX_BRANCH="${TAX_BRANCH}" \
+          MEDIA_BRANCH="${MEDIA_BRANCH}" \
+          SEARCH_BRANCH="${SEARCH_BRANCH}" \
+          STOREFRONT_BFF_BRANCH="${STOREFRONT_BFF_BRANCH}" \
+          BACKOFFICE_BFF_BRANCH="${BACKOFFICE_BFF_BRANCH}" \
+          STOREFRONT_UI_BRANCH="${STOREFRONT_UI_BRANCH}" \
+          BACKOFFICE_UI_BRANCH="${BACKOFFICE_UI_BRANCH}" \
+          SAMPLEDATA_BRANCH="${SAMPLEDATA_BRANCH}" \
+          ./scripts/cd/developer_build.sh
+        '''
+      }
+    }
+  }
+}

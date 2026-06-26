@@ -203,6 +203,66 @@ gatewayRoutesConfig:
 
 backofficeBffExtraConfig:
   spring:
+    cloud:
+      gateway:
+        server:
+          webflux:
+            default-filters:
+              - SaveSession
+            routes:
+              - id: product_api
+                uri: http://product
+                predicates:
+                  - Path=/api/product/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: inventory_api
+                uri: http://inventory
+                predicates:
+                  - Path=/api/inventory/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: cart_api
+                uri: http://cart
+                predicates:
+                  - Path=/api/cart/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: customer_api
+                uri: http://customer
+                predicates:
+                  - Path=/api/customer/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: media_api
+                uri: http://media
+                predicates:
+                  - Path=/api/media/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: tax_api
+                uri: http://tax
+                predicates:
+                  - Path=/api/tax/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: order_api
+                uri: http://order
+                predicates:
+                  - Path=/api/order/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: ui
+                uri: http://backoffice-ui:3000
+                predicates:
+                  - Path=/**
     data:
       redis:
         host: redis-master.redis
@@ -223,6 +283,66 @@ backofficeBffExtraConfig:
 
 storefrontBffExtraConfig:
   spring:
+    cloud:
+      gateway:
+        server:
+          webflux:
+            default-filters:
+              - SaveSession
+            routes:
+              - id: product_api
+                uri: http://product
+                predicates:
+                  - Path=/api/product/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: inventory_api
+                uri: http://inventory
+                predicates:
+                  - Path=/api/inventory/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: cart_api
+                uri: http://cart
+                predicates:
+                  - Path=/api/cart/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: customer_api
+                uri: http://customer
+                predicates:
+                  - Path=/api/customer/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: media_api
+                uri: http://media
+                predicates:
+                  - Path=/api/media/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: tax_api
+                uri: http://tax
+                predicates:
+                  - Path=/api/tax/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: order_api
+                uri: http://order
+                predicates:
+                  - Path=/api/order/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: ui
+                uri: http://storefront-ui:3000
+                predicates:
+                  - Path=/**
     data:
       redis:
         host: redis-master.redis
