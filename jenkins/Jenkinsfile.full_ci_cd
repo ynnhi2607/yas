@@ -104,6 +104,7 @@ pipeline {
         script {
           env.REPO_URL = sh(returnStdout: true, script: 'git config --get remote.origin.url').trim()
         }
+        sh 'rm -f .jenkins-built-commits'
       }
     }
 
@@ -136,7 +137,7 @@ pipeline {
 
             def commitId = buildServiceImage(service, branch, env.REPO_URL)
             def commitEnvName = branchParamName(service.name) + '_COMMIT'
-            env[commitEnvName] = commitId
+            sh "printf '%s=%s\\n' '${commitEnvName}' '${commitId}' >> .jenkins-built-commits"
             echo "Built ${service.name}: ${env.DOCKERHUB_USERNAME}/${service.image}:${commitId}"
           }
         }
@@ -146,6 +147,12 @@ pipeline {
     stage('Deploy to Kubernetes') {
       steps {
         sh '''
+          set -a
+          if [ -f .jenkins-built-commits ]; then
+            . ./.jenkins-built-commits
+          fi
+          set +a
+
           chmod +x scripts/cd/developer_build.sh
           NAMESPACE="${NAMESPACE}" \
           DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME}" \
