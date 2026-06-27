@@ -144,24 +144,16 @@ Voi `Jenkinsfile.full_ci_cd`, tao Jenkins credential:
 - Username: Docker Hub username
 - Password: Docker Hub access token
 
-Parameters co san trong Jenkinsfile:
+Parameters chinh trong Jenkinsfile:
 
 - `NAMESPACE`: namespace deploy, mac dinh `yas`
 - `DOCKERHUB_USERNAME`: Docker Hub username/org
 - `DEPLOY_SAMPLEDATA`: bat khi can seed data
-- `PRODUCT_BRANCH`
-- `CART_BRANCH`
-- `ORDER_BRANCH`
-- `CUSTOMER_BRANCH`
-- `INVENTORY_BRANCH`
-- `TAX_BRANCH`
-- `MEDIA_BRANCH`
-- `SEARCH_BRANCH`
-- `STOREFRONT_BFF_BRANCH`
-- `BACKOFFICE_BFF_BRANCH`
-- `STOREFRONT_UI_BRANCH`
-- `BACKOFFICE_UI_BRANCH`
-- `SAMPLEDATA_BRANCH`
+- `BASE_BRANCH`: branch mac dinh cho tat ca service, thuong la `main`
+- `TARGET_SERVICE`: service can build lai, vi du `tax`
+- `TARGET_BRANCH`: branch cua service can test, vi du `dev_tax_service`
+- `BUILD_BASE_IMAGES`: co build lai cac service o `BASE_BRANCH` hay khong, thuong de `false`
+- `PUSH_LATEST_FOR_BASE`: co tag image base thanh `latest` hay khong, thuong de `false`
 
 ## 5. Cach deploy branch cua developer
 
@@ -174,10 +166,12 @@ dev_tax_service
 Chay job `developer_build` voi:
 
 ```text
-TAX_BRANCH=dev_tax_service
+BASE_BRANCH=main
+TARGET_SERVICE=tax
+TARGET_BRANCH=dev_tax_service
 ```
 
-Cac service con lai de `main`.
+Jenkins se tu hieu: chi build lai service `tax` tu branch `dev_tax_service`, cac service con lai lay theo `BASE_BRANCH=main` va dung image mac dinh `latest/main`.
 
 Script se:
 
@@ -298,7 +292,7 @@ Nen chup cac man hinh:
 
 - Docker Hub co image tag commit id, vi du `yas-tax:a1b2c3d`.
 - GitHub Actions workflow `CI Demo Images` build/push thanh cong.
-- Jenkins job `developer_build` voi parameter `TAX_BRANCH=dev_tax_service`.
+- Jenkins job `developer_build` voi parameter `BASE_BRANCH=main`, `TARGET_SERVICE=tax`, `TARGET_BRANCH=dev_tax_service`.
 - Console log Jenkins dong deploy image dung commit id.
 - `kubectl get pods -n yas`.
 - `kubectl get svc -n ingress-nginx ingress-nginx-controller` hien `NodePort`.

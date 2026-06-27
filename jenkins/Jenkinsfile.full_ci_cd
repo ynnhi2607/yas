@@ -24,7 +24,11 @@ def branchParamName(String serviceName) {
 }
 
 def branchFor(Map service) {
-  return params[branchParamName(service.name)]?.trim() ?: 'main'
+  def baseBranch = params.BASE_BRANCH?.trim() ?: 'main'
+  if (service.name == params.TARGET_SERVICE) {
+    return params.TARGET_BRANCH?.trim() ?: baseBranch
+  }
+  return baseBranch
 }
 
 def buildServiceImage(Map service, String branch, String repoUrl) {
@@ -53,13 +57,13 @@ def buildServiceImage(Map service, String branch, String repoUrl) {
 
     sh "docker build -t ${env.DOCKERHUB_USERNAME}/${service.image}:${commitId} ${service.context}"
 
-    if (params.PUSH_LATEST_FOR_MAIN && branch == 'main') {
+    if (params.PUSH_LATEST_FOR_BASE && branch == params.BASE_BRANCH) {
       sh "docker tag ${env.DOCKERHUB_USERNAME}/${service.image}:${commitId} ${env.DOCKERHUB_USERNAME}/${service.image}:latest"
     }
 
     sh "docker push ${env.DOCKERHUB_USERNAME}/${service.image}:${commitId}"
 
-    if (params.PUSH_LATEST_FOR_MAIN && branch == 'main') {
+    if (params.PUSH_LATEST_FOR_BASE && branch == params.BASE_BRANCH) {
       sh "docker push ${env.DOCKERHUB_USERNAME}/${service.image}:latest"
     }
   }
@@ -74,23 +78,24 @@ pipeline {
     string(name: 'NAMESPACE', defaultValue: 'yas', description: 'Kubernetes namespace to deploy to')
     string(name: 'DOCKERHUB_USERNAME', defaultValue: 'ynnhi2607', description: 'Docker Hub username/org')
     string(name: 'DOCKERHUB_CREDENTIALS_ID', defaultValue: 'dockerhub', description: 'Jenkins username/password credentials id')
-    booleanParam(name: 'BUILD_MAIN_IMAGES', defaultValue: false, description: 'Build main images too. Slow, but useful for screenshots.')
-    booleanParam(name: 'PUSH_LATEST_FOR_MAIN', defaultValue: false, description: 'Also tag main images as latest when BUILD_MAIN_IMAGES=true')
+    string(name: 'BASE_BRANCH', defaultValue: 'main', description: 'Default branch for all services except TARGET_SERVICE')
+    choice(name: 'TARGET_SERVICE', choices: '''product
+cart
+order
+customer
+inventory
+tax
+media
+search
+storefront-bff
+backoffice-bff
+storefront-ui
+backoffice-ui
+sampledata''', description: 'Service that needs to be rebuilt from TARGET_BRANCH')
+    string(name: 'TARGET_BRANCH', defaultValue: 'dev_tax_service', description: 'Branch or commit for TARGET_SERVICE')
+    booleanParam(name: 'BUILD_BASE_IMAGES', defaultValue: false, description: 'Build BASE_BRANCH images too. Slow; normally keep false and use latest/main images.')
+    booleanParam(name: 'PUSH_LATEST_FOR_BASE', defaultValue: false, description: 'Also tag BASE_BRANCH images as latest when BUILD_BASE_IMAGES=true')
     booleanParam(name: 'DEPLOY_SAMPLEDATA', defaultValue: false, description: 'Run sampledata once when seeding demo data')
-
-    string(name: 'PRODUCT_BRANCH', defaultValue: 'main', description: 'Branch for product')
-    string(name: 'CART_BRANCH', defaultValue: 'main', description: 'Branch for cart')
-    string(name: 'ORDER_BRANCH', defaultValue: 'main', description: 'Branch for order')
-    string(name: 'CUSTOMER_BRANCH', defaultValue: 'main', description: 'Branch for customer')
-    string(name: 'INVENTORY_BRANCH', defaultValue: 'main', description: 'Branch for inventory')
-    string(name: 'TAX_BRANCH', defaultValue: 'main', description: 'Branch for tax')
-    string(name: 'MEDIA_BRANCH', defaultValue: 'main', description: 'Branch for media')
-    string(name: 'SEARCH_BRANCH', defaultValue: 'main', description: 'Branch for search')
-    string(name: 'STOREFRONT_BFF_BRANCH', defaultValue: 'main', description: 'Branch for storefront-bff')
-    string(name: 'BACKOFFICE_BFF_BRANCH', defaultValue: 'main', description: 'Branch for backoffice-bff')
-    string(name: 'STOREFRONT_UI_BRANCH', defaultValue: 'main', description: 'Branch for storefront-ui')
-    string(name: 'BACKOFFICE_UI_BRANCH', defaultValue: 'main', description: 'Branch for backoffice-ui')
-    string(name: 'SAMPLEDATA_BRANCH', defaultValue: 'main', description: 'Branch for sampledata')
   }
 
   environment {
@@ -128,10 +133,10 @@ pipeline {
 
           allServices.each { service ->
             def branch = branchFor(service)
-            def shouldBuild = params.BUILD_MAIN_IMAGES || branch != 'main'
+            def shouldBuild = params.BUILD_BASE_IMAGES || service.name == params.TARGET_SERVICE
 
             if (!shouldBuild) {
-              echo "Skip build ${service.name}: branch=main, using default latest image"
+              echo "Skip build ${service.name}: branch=${branch}, using default latest/main image"
               return
             }
 
@@ -146,8 +151,17 @@ pipeline {
 
     stage('Deploy to Kubernetes') {
       steps {
+        script {
+          def deployEnv = allServices.collect { service ->
+            "${branchParamName(service.name)}=${branchFor(service)}"
+          }.join('\n') + '\n'
+          writeFile file: '.jenkins-deploy-env', text: deployEnv
+        }
         sh '''
           set -a
+          if [ -f .jenkins-deploy-env ]; then
+            . ./.jenkins-deploy-env
+          fi
           if [ -f .jenkins-built-commits ]; then
             . ./.jenkins-built-commits
           fi
