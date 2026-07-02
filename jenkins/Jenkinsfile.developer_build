@@ -103,6 +103,8 @@ pipeline {
           docker version
           kubectl version --client=true
           helm version
+          helm repo add stakater https://stakater.github.io/stakater-charts || true
+          helm repo update
           kubectl get nodes
         '''
       }
