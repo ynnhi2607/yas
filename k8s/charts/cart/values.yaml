@@ -5,6 +5,10 @@ backend:
 
   nameOverride: cart
   fullnameOverride: cart
+  hostAliases:
+    - ip: 10.107.223.248
+      hostnames:
+        - identity.yas.local.com
   databaseName: cart
   ingress:
     enabled: false

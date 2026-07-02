@@ -5,6 +5,10 @@ backend:
 
   nameOverride: product
   fullnameOverride: product
+  hostAliases:
+    - ip: 10.107.223.248
+      hostnames:
+        - identity.yas.local.com
   databaseName: product
   ingress:
     enabled: false

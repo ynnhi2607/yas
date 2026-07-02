@@ -5,6 +5,10 @@ backend:
 
   nameOverride: inventory
   fullnameOverride: inventory
+  hostAliases:
+    - ip: 10.107.223.248
+      hostnames:
+        - identity.yas.local.com
   databaseName: inventory
   ingress:
     enabled: false

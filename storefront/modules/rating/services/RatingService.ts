@@ -21,6 +21,9 @@ export async function getRatingsByProductId(
   const final_url = concatQueryString(queryString, url);
 
   const response = await apiClientService.get(final_url);
+  if (response.status === 404) {
+    return { ratingList: [], totalPages: 0, totalElements: 0 };
+  }
   return await response.json();
 }
 
@@ -36,6 +39,10 @@ export async function getAverageStarByProductId(productId: number): Promise<numb
   const url = `${baseUrl}/ratings/product/${productId}/average-star`;
 
   const response = await apiClientService.get(url);
+
+  if (response.status === 404) {
+    return 0;
+  }
 
   if (response.status >= 200 && response.status < 300) {
     return await response.json();

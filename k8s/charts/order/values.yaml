@@ -5,6 +5,10 @@ backend:
 
   nameOverride: order
   fullnameOverride: order
+  hostAliases:
+    - ip: 10.107.223.248
+      hostnames:
+        - identity.yas.local.com
   databaseName: order
   ingress:
     enabled: false

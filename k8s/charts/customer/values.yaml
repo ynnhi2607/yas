@@ -5,6 +5,10 @@ backend:
 
   nameOverride: customer
   fullnameOverride: customer
+  hostAliases:
+    - ip: 10.107.223.248
+      hostnames:
+        - identity.yas.local.com
   databaseName: customer
   ingress:
     enabled: false

@@ -5,6 +5,10 @@ backend:
 
   nameOverride: media
   fullnameOverride: media
+  hostAliases:
+    - ip: 10.107.223.248
+      hostnames:
+        - identity.yas.local.com
   databaseName: media
   ingress:
     enabled: false
@@ -17,4 +21,3 @@ backend:
       mountPath: /opt/yas/media
   extraApplicationConfigPaths:
     - /opt/yas/media/media-application.yaml
-

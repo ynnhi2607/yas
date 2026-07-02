@@ -59,6 +59,7 @@ export async function getSimilarProductsByProductId(productId: number): Promise<
   const res = await apiClientService.get(
     `/api/recommendation/embedding/product/${productId}/similarity`
   );
+  if (res.status === 404) return [];
   if (res.status >= 200 && res.status < 300) return res.json();
   throw new Error(await res.json());
 }

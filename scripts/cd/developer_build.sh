@@ -75,11 +75,11 @@ short_sha_for_branch() {
   local branch="$1"
 
   if [[ "$branch" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
-    echo "${branch:0:7}"
+    echo "${branch:0:8}"
     return
   fi
 
-  git -C "${ROOT_DIR}" ls-remote origin "refs/heads/${branch}" | awk '{print substr($1, 1, 7)}'
+  git -C "${ROOT_DIR}" ls-remote origin "refs/heads/${branch}" | awk '{print substr($1, 1, 8)}'
 }
 
 image_tag_for() {
@@ -89,7 +89,7 @@ image_tag_for() {
   commit_var="$(env_name "$service")_COMMIT"
 
   if [[ -n "${!commit_var:-}" ]]; then
-    echo "${!commit_var:0:7}"
+    echo "${!commit_var:0:8}"
     return
   fi
 
