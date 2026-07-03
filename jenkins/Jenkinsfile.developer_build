@@ -1,17 +1,17 @@
 def services = [
-  [name: 'product', image: 'yas-product', context: 'product', type: 'backend'],
-  [name: 'cart', image: 'yas-cart', context: 'cart', type: 'backend'],
-  [name: 'order', image: 'yas-order', context: 'order', type: 'backend'],
-  [name: 'customer', image: 'yas-customer', context: 'customer', type: 'backend'],
-  [name: 'inventory', image: 'yas-inventory', context: 'inventory', type: 'backend'],
-  [name: 'tax', image: 'yas-tax', context: 'tax', type: 'backend'],
-  [name: 'media', image: 'yas-media', context: 'media', type: 'backend'],
-  [name: 'search', image: 'yas-search', context: 'search', type: 'backend'],
-  [name: 'storefront-bff', image: 'yas-storefront-bff', context: 'storefront-bff', type: 'backend'],
-  [name: 'backoffice-bff', image: 'yas-backoffice-bff', context: 'backoffice-bff', type: 'backend'],
-  [name: 'storefront-ui', image: 'yas-storefront', context: 'storefront', type: 'ui'],
-  [name: 'backoffice-ui', image: 'yas-backoffice', context: 'backoffice', type: 'ui'],
-  [name: 'sampledata', image: 'yas-sampledata', context: 'sampledata', type: 'backend']
+  [name: 'product'],
+  [name: 'cart'],
+  [name: 'order'],
+  [name: 'customer'],
+  [name: 'inventory'],
+  [name: 'tax'],
+  [name: 'media'],
+  [name: 'search'],
+  [name: 'storefront-bff'],
+  [name: 'backoffice-bff'],
+  [name: 'storefront-ui'],
+  [name: 'backoffice-ui'],
+  [name: 'sampledata']
 ]
 
 def branchParamName(String serviceName) {
@@ -23,48 +23,12 @@ def branchFor(Map service) {
   return params[paramName]?.trim() ?: 'main'
 }
 
-def shouldBuildBranch(String branch) {
-  return branch && branch != 'main' && branch != 'master' && branch != 'latest'
-}
-
-def buildAndPushServiceImage(Map service, String branch, String repoUrl) {
-  def buildDir = "build/${service.name}"
-  def commitId = ''
-
-  dir(buildDir) {
-    deleteDir()
-    checkout([
-      $class: 'GitSCM',
-      branches: [[name: "*/${branch}"]],
-      userRemoteConfigs: [[url: repoUrl]]
-    ])
-
-    commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-
-    if (service.type == 'backend') {
-      sh '''
-        sed -i 's/<java.version>25<\\/java.version>/<java.version>21<\\/java.version>/' pom.xml
-        sed -i 's/<maven.compiler.source>25<\\/maven.compiler.source>/<maven.compiler.source>21<\\/maven.compiler.source>/' pom.xml
-        sed -i 's/<maven.compiler.target>25<\\/maven.compiler.target>/<maven.compiler.target>21<\\/maven.compiler.target>/' pom.xml
-        find . -maxdepth 2 -name Dockerfile -exec sed -i 's/eclipse-temurin:25-jre-alpine/eclipse-temurin:21-jre-alpine/g' {} \\;
-      '''
-      sh "mvn -pl ${service.context} -am clean package -DskipTests"
-    }
-
-    sh "docker build -t ${env.DOCKERHUB_USERNAME}/${service.image}:${commitId} ${service.context}"
-    sh "docker push ${env.DOCKERHUB_USERNAME}/${service.image}:${commitId}"
-  }
-
-  return commitId
-}
-
 pipeline {
   agent any
 
   parameters {
     string(name: 'NAMESPACE', defaultValue: 'yas', description: 'Kubernetes namespace to deploy to')
     string(name: 'DOCKERHUB_USERNAME', defaultValue: 'ynnhi2607', description: 'Docker Hub username/org')
-    string(name: 'DOCKERHUB_CREDENTIALS_ID', defaultValue: 'dockerhub', description: 'Jenkins username/password credentials id for Docker Hub')
     booleanParam(name: 'DEPLOY_SAMPLEDATA', defaultValue: false, description: 'Run sampledata once when seeding demo data')
 
     string(name: 'PRODUCT_BRANCH', defaultValue: 'main', description: 'Branch or commit for product')
@@ -82,55 +46,23 @@ pipeline {
     string(name: 'SAMPLEDATA_BRANCH', defaultValue: 'main', description: 'Branch or commit for sampledata')
   }
 
-  environment {
-    DOCKER_BUILDKIT = '0'
-  }
-
   stages {
     stage('Checkout pipeline repo') {
       steps {
         checkout scm
-        script {
-          env.REPO_URL = sh(returnStdout: true, script: 'git config --get remote.origin.url').trim()
-        }
-        sh 'rm -f .jenkins-built-commits .jenkins-deploy-env'
+        sh 'rm -f .jenkins-deploy-env'
       }
     }
 
     stage('Check Jenkins tools') {
       steps {
         sh '''
-          docker version
           kubectl version --client=true
           helm version
           helm repo add stakater https://stakater.github.io/stakater-charts || true
           helm repo update
           kubectl get nodes
         '''
-      }
-    }
-
-    stage('Build and push branch images') {
-      steps {
-        script {
-          withCredentials([usernamePassword(credentialsId: params.DOCKERHUB_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-            sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
-          }
-
-          services.each { service ->
-            def branch = branchFor(service)
-
-            if (!shouldBuildBranch(branch)) {
-              echo "Skip build ${service.name}: branch=${branch}, using default main/latest image"
-              return
-            }
-
-            def commitId = buildAndPushServiceImage(service, branch, env.REPO_URL)
-            def commitEnvName = branchParamName(service.name) + '_COMMIT'
-            sh "printf '%s=%s\\n' '${commitEnvName}' '${commitId}' >> .jenkins-built-commits"
-            echo "Built ${service.name}: ${env.DOCKERHUB_USERNAME}/${service.image}:${commitId}"
-          }
-        }
       }
     }
 
@@ -146,9 +78,6 @@ pipeline {
           set -a
           if [ -f .jenkins-deploy-env ]; then
             . ./.jenkins-deploy-env
-          fi
-          if [ -f .jenkins-built-commits ]; then
-            . ./.jenkins-built-commits
           fi
           set +a
 

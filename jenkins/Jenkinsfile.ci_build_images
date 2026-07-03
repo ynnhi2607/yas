@@ -1,0 +1,216 @@
+def backendServices = [
+  [name: 'product', image: 'yas-product', context: 'product'],
+  [name: 'cart', image: 'yas-cart', context: 'cart'],
+  [name: 'order', image: 'yas-order', context: 'order'],
+  [name: 'customer', image: 'yas-customer', context: 'customer'],
+  [name: 'inventory', image: 'yas-inventory', context: 'inventory'],
+  [name: 'tax', image: 'yas-tax', context: 'tax'],
+  [name: 'media', image: 'yas-media', context: 'media'],
+  [name: 'search', image: 'yas-search', context: 'search'],
+  [name: 'storefront-bff', image: 'yas-storefront-bff', context: 'storefront-bff'],
+  [name: 'backoffice-bff', image: 'yas-backoffice-bff', context: 'backoffice-bff'],
+  [name: 'sampledata', image: 'yas-sampledata', context: 'sampledata']
+]
+
+def uiServices = [
+  [name: 'storefront-ui', image: 'yas-storefront', context: 'storefront'],
+  [name: 'backoffice-ui', image: 'yas-backoffice', context: 'backoffice']
+]
+
+def allServices = backendServices + uiServices
+
+def serviceByPath = [:]
+backendServices.each { service ->
+  serviceByPath[service.context] = service.name
+}
+uiServices.each { service ->
+  serviceByPath[service.context] = service.name
+}
+
+def resolveChangedFiles() {
+  def previousCommit = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?: ''
+  if (previousCommit) {
+    return sh(
+      script: "git diff --name-only ${previousCommit} HEAD",
+      returnStdout: true
+    ).trim().readLines().findAll { it?.trim() }
+  }
+
+  def hasParent = sh(script: 'git rev-parse HEAD~1 >/dev/null 2>&1', returnStatus: true) == 0
+  if (hasParent) {
+    return sh(
+      script: 'git diff --name-only HEAD~1 HEAD',
+      returnStdout: true
+    ).trim().readLines().findAll { it?.trim() }
+  }
+
+  return sh(
+    script: "git show --name-only --pretty='' HEAD",
+    returnStdout: true
+  ).trim().readLines().findAll { it?.trim() }
+}
+
+def resolveServicesToBuild(List changedFiles) {
+  def servicesToBuild = [] as LinkedHashSet
+  def buildAllBackends = false
+  def buildAllServices = false
+
+  changedFiles.each { file ->
+    if (!file) {
+      return
+    }
+
+    if (file == 'pom.xml' || file.startsWith('common-library/')) {
+      buildAllBackends = true
+      return
+    }
+
+    if (file.startsWith('jenkins/') || file.startsWith('scripts/cd/')) {
+      return
+    }
+
+    def topLevel = file.tokenize('/').first()
+    if (serviceByPath.containsKey(topLevel)) {
+      servicesToBuild << serviceByPath[topLevel]
+    }
+  }
+
+  if (buildAllServices) {
+    return allServices.collect { it.name }
+  }
+
+  if (buildAllBackends) {
+    backendServices.each { servicesToBuild << it.name }
+  }
+
+  return servicesToBuild as List
+}
+
+def serviceConfig(String serviceName) {
+  def service = allServices.find { it.name == serviceName }
+  if (!service) {
+    error("Unknown service '${serviceName}'")
+  }
+  return service
+}
+
+def buildBackendJar(Map service) {
+  sh '''
+    sed -i 's/<java.version>25<\\/java.version>/<java.version>21<\\/java.version>/' pom.xml
+    sed -i 's/<maven.compiler.source>25<\\/maven.compiler.source>/<maven.compiler.source>21<\\/maven.compiler.source>/' pom.xml
+    sed -i 's/<maven.compiler.target>25<\\/maven.compiler.target>/<maven.compiler.target>21<\\/maven.compiler.target>/' pom.xml
+    find . -maxdepth 2 -name Dockerfile -exec sed -i 's/eclipse-temurin:25-jre-alpine/eclipse-temurin:21-jre-alpine/g' {} \\;
+  '''
+  sh "mvn -pl ${service.context} -am clean package -DskipTests"
+}
+
+def buildAndPushImage(Map service, String commitTag, String branchName) {
+  def image = "${env.DOCKERHUB_USERNAME}/${service.image}:${commitTag}"
+
+  if (backendServices.find { it.name == service.name }) {
+    buildBackendJar(service)
+  }
+
+  sh "docker build -t ${image} ${service.context}"
+  sh "docker push ${image}"
+
+  if (branchName == 'main' || branchName == 'master') {
+    sh "docker tag ${image} ${env.DOCKERHUB_USERNAME}/${service.image}:latest"
+    sh "docker push ${env.DOCKERHUB_USERNAME}/${service.image}:latest"
+    sh "docker tag ${image} ${env.DOCKERHUB_USERNAME}/${service.image}:main"
+    sh "docker push ${env.DOCKERHUB_USERNAME}/${service.image}:main"
+  }
+
+  echo "Pushed image: ${image}"
+}
+
+pipeline {
+  agent any
+
+  triggers {
+    githubPush()
+    pollSCM('H/2 * * * *')
+  }
+
+  parameters {
+    string(name: 'DOCKERHUB_USERNAME', defaultValue: 'ynnhi2607', description: 'Docker Hub username/org')
+    string(name: 'DOCKERHUB_CREDENTIALS_ID', defaultValue: 'dockerhub', description: 'Jenkins username/password credentials id')
+    booleanParam(name: 'BUILD_ALL', defaultValue: false, description: 'Force build all demo services')
+  }
+
+  environment {
+    DOCKER_BUILDKIT = '0'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Resolve build plan') {
+      steps {
+        script {
+          env.COMMIT_TAG = sh(returnStdout: true, script: 'git rev-parse --short=8 HEAD').trim()
+          env.CURRENT_BRANCH = env.BRANCH_NAME ?: sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
+
+          def changedFiles = resolveChangedFiles()
+          echo "Current branch: ${env.CURRENT_BRANCH}"
+          echo "Commit tag: ${env.COMMIT_TAG}"
+          echo "Changed files:\n${changedFiles.join('\n')}"
+
+          def selectedServices = params.BUILD_ALL ? allServices.collect { it.name } : resolveServicesToBuild(changedFiles)
+          env.SELECTED_SERVICES = selectedServices.join(',')
+
+          echo "Services to build: ${env.SELECTED_SERVICES ?: 'none'}"
+        }
+      }
+    }
+
+    stage('Check tools') {
+      when {
+        expression { env.SELECTED_SERVICES?.trim() }
+      }
+      steps {
+        sh '''
+          docker version
+          mvn -version
+          node --version || true
+          npm --version || true
+        '''
+      }
+    }
+
+    stage('Docker login') {
+      when {
+        expression { env.SELECTED_SERVICES?.trim() }
+      }
+      steps {
+        withCredentials([usernamePassword(credentialsId: params.DOCKERHUB_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+          sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
+        }
+      }
+    }
+
+    stage('Build and push images') {
+      when {
+        expression { env.SELECTED_SERVICES?.trim() }
+      }
+      steps {
+        script {
+          env.SELECTED_SERVICES.split(',').findAll { it?.trim() }.each { serviceName ->
+            def service = serviceConfig(serviceName.trim())
+            buildAndPushImage(service, env.COMMIT_TAG, env.CURRENT_BRANCH)
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      sh 'docker logout || true'
+    }
+  }
+}
