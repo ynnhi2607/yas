@@ -1,0 +1,52 @@
+pipeline {
+  agent any
+
+  parameters {
+    choice(name: 'ENVIRONMENT', choices: ['dev', 'staging'], description: 'GitOps environment to update')
+    choice(name: 'SERVICE', choices: [
+      'product',
+      'cart',
+      'order',
+      'customer',
+      'inventory',
+      'tax',
+      'media',
+      'search',
+      'storefront-bff',
+      'backoffice-bff',
+      'storefront-ui',
+      'backoffice-ui',
+      'sampledata'
+    ], description: 'Service image tag to update')
+    string(name: 'IMAGE_TAG', defaultValue: '', description: 'Docker image tag, for example ddaa8b60 or v1.0.0')
+    string(name: 'DOCKERHUB_USERNAME', defaultValue: 'ynnhi2607', description: 'Docker Hub username/org')
+    string(name: 'GITOPS_REPO_URL', defaultValue: 'https://github.com/ynnhi2607/yas-gitops.git', description: 'GitOps repository URL')
+    string(name: 'GITOPS_REPO_DIR', defaultValue: '../yas-gitops', description: 'Local GitOps repo path from this workspace')
+    booleanParam(name: 'PUSH_GITOPS', defaultValue: false, description: 'Push GitOps commit to origin/main')
+  }
+
+  stages {
+    stage('Checkout pipeline repo') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Update GitOps image tag') {
+      steps {
+        sh '''
+          test -n "${IMAGE_TAG}"
+          chmod +x scripts/cd/update_gitops_image.sh
+          ENVIRONMENT="${ENVIRONMENT}" \
+          SERVICE="${SERVICE}" \
+          IMAGE_TAG="${IMAGE_TAG}" \
+          DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME}" \
+          GITOPS_REPO_URL="${GITOPS_REPO_URL}" \
+          GITOPS_REPO_DIR="${GITOPS_REPO_DIR}" \
+          PUSH_GITOPS="${PUSH_GITOPS}" \
+          ./scripts/cd/update_gitops_image.sh
+        '''
+      }
+    }
+  }
+}
