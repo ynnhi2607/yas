@@ -27,7 +27,7 @@ uiServices.each { service ->
   serviceByPath[service.context] = service.name
 }
 
-def resolveChangedFiles() {
+def resolveChangedFiles = {
   def previousCommit = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?: ''
   if (previousCommit) {
     return sh(
@@ -50,7 +50,7 @@ def resolveChangedFiles() {
   ).trim().readLines().findAll { it?.trim() }
 }
 
-def resolveServicesToBuild(List changedFiles) {
+def resolveServicesToBuild = { List changedFiles ->
   def servicesToBuild = [] as LinkedHashSet
   def buildAllBackends = false
   def buildAllServices = false
@@ -86,7 +86,7 @@ def resolveServicesToBuild(List changedFiles) {
   return servicesToBuild as List
 }
 
-def serviceConfig(String serviceName) {
+def serviceConfig = { String serviceName ->
   def service = allServices.find { it.name == serviceName }
   if (!service) {
     error("Unknown service '${serviceName}'")
@@ -94,7 +94,7 @@ def serviceConfig(String serviceName) {
   return service
 }
 
-def buildBackendJar(Map service) {
+def buildBackendJar = { Map service ->
   sh '''
     sed -i 's/<java.version>25<\\/java.version>/<java.version>21<\\/java.version>/' pom.xml
     sed -i 's/<maven.compiler.source>25<\\/maven.compiler.source>/<maven.compiler.source>21<\\/maven.compiler.source>/' pom.xml
@@ -104,7 +104,7 @@ def buildBackendJar(Map service) {
   sh "mvn -pl ${service.context} -am clean package -DskipTests"
 }
 
-def buildAndPushImage(Map service, String commitTag, String branchName) {
+def buildAndPushImage = { Map service, String commitTag, String branchName ->
   def image = "${env.DOCKERHUB_USERNAME}/${service.image}:${commitTag}"
 
   if (backendServices.find { it.name == service.name }) {
