@@ -234,6 +234,7 @@ Expected:
 - Vi du sua `tax/...` thi chi test/build/push image `ynnhi2607/yas-tax:<commit-id>`.
 - Neu sua `common-library/...` hoac root `pom.xml` thi build lai cac backend service demo.
 - Phase `Test selected services` chay test backend, upload JUnit report va Jacoco coverage.
+- Backend CI chay giong pipeline tham khao: `mvn clean install jacoco:report -pl <service> -am`, bao gom integration test neu service co cau hinh Failsafe/Testcontainers.
 - Phase `Build and push images` build Docker image va push len Docker Hub voi tag la short commit id.
 - Khi branch `main` chay thanh cong, pipeline push them tag `main/latest` va update GitOps `dev`.
 - Khi build tag release `v*`, pipeline retag image `main` thanh release tag va update GitOps `staging`.
@@ -277,10 +278,9 @@ Build and push images    Docker build/push sau khi cac gate pass
 Snyk:
 
 ```text
-ENABLE_SNYK=false           # mac dinh de CI demo xanh
-ENABLE_SNYK=true            # bat khi can chup minh chung Snyk scan
-SNYK_FAIL_ON_ISSUES=false  # mac dinh: van scan, neu co high vuln thi mark unstable nhung cho build tiep
-SNYK_FAIL_ON_ISSUES=true   # demo security gate fail khi co high vuln
+ENABLE_SNYK=true            # mac dinh: bat Snyk scan giong pipeline tham khao
+SNYK_FAIL_ON_ISSUES=true    # mac dinh: fail pipeline neu con high vulnerability
+SNYK_FAIL_ON_ISSUES=false   # chi dung tam neu muon chup report Snyk nhung khong chan build
 ```
 
 Sonar project key se duoc override theo service:

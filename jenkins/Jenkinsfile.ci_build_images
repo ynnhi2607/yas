@@ -123,7 +123,7 @@ def publishBackendTestReports = { Map service ->
 def testBackendService = { Map service ->
   prepareJava21Build()
   try {
-    sh "mvn -pl ${service.context} -am clean verify jacoco:report"
+    sh "mvn clean install jacoco:report -pl ${service.context} -am"
   } finally {
     publishBackendTestReports(service)
   }
@@ -286,8 +286,8 @@ pipeline {
     string(name: 'SONAR_PROJECT_PREFIX', defaultValue: 'ynnhi2607_yas', description: 'Sonar project key prefix, final key is <prefix>-<service>')
     string(name: 'SONAR_SCANNER_TOOL', defaultValue: 'SonarScanner', description: 'Jenkins SonarScanner tool name for frontend services')
     string(name: 'NODEJS_TOOL', defaultValue: 'node20', description: 'Jenkins NodeJS tool name')
-    booleanParam(name: 'ENABLE_SNYK', defaultValue: false, description: 'Run Snyk high severity vulnerability scan')
-    booleanParam(name: 'SNYK_FAIL_ON_ISSUES', defaultValue: false, description: 'Fail pipeline when Snyk finds high severity vulnerabilities')
+    booleanParam(name: 'ENABLE_SNYK', defaultValue: true, description: 'Run Snyk high severity vulnerability scan')
+    booleanParam(name: 'SNYK_FAIL_ON_ISSUES', defaultValue: true, description: 'Fail pipeline when Snyk finds high severity vulnerabilities')
     string(name: 'SNYK_CREDENTIALS_ID', defaultValue: 'snyk-token', description: 'Jenkins secret text credentials id for Snyk token')
   }
 
