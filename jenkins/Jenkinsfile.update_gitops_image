@@ -22,6 +22,7 @@ pipeline {
     string(name: 'DOCKERHUB_USERNAME', defaultValue: 'ynnhi2607', description: 'Docker Hub username/org')
     string(name: 'GITOPS_REPO_URL', defaultValue: 'https://github.com/ynnhi2607/yas-gitops.git', description: 'GitOps repository URL')
     string(name: 'GITOPS_REPO_DIR', defaultValue: '../yas-gitops', description: 'Local GitOps repo path from this workspace')
+    string(name: 'GITOPS_CREDENTIALS_ID', defaultValue: 'github-token', description: 'Jenkins username/password credential for GitHub token')
     booleanParam(name: 'PUSH_GITOPS', defaultValue: false, description: 'Push GitOps commit to origin/main')
   }
 
@@ -34,18 +35,28 @@ pipeline {
 
     stage('Update GitOps image tag') {
       steps {
-        sh '''
-          test -n "${IMAGE_TAG}"
-          chmod +x scripts/cd/update_gitops_image.sh
-          ENVIRONMENT="${ENVIRONMENT}" \
-          SERVICE="${SERVICE}" \
-          IMAGE_TAG="${IMAGE_TAG}" \
-          DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME}" \
-          GITOPS_REPO_URL="${GITOPS_REPO_URL}" \
-          GITOPS_REPO_DIR="${GITOPS_REPO_DIR}" \
-          PUSH_GITOPS="${PUSH_GITOPS}" \
-          ./scripts/cd/update_gitops_image.sh
-        '''
+        script {
+          def updateCommand = '''
+            test -n "${IMAGE_TAG}"
+            chmod +x scripts/cd/update_gitops_image.sh
+            ENVIRONMENT="${ENVIRONMENT}" \
+            SERVICE="${SERVICE}" \
+            IMAGE_TAG="${IMAGE_TAG}" \
+            DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME}" \
+            GITOPS_REPO_URL="${GITOPS_REPO_URL}" \
+            GITOPS_REPO_DIR="${GITOPS_REPO_DIR}" \
+            PUSH_GITOPS="${PUSH_GITOPS}" \
+            ./scripts/cd/update_gitops_image.sh
+          '''
+
+          if (params.PUSH_GITOPS) {
+            withCredentials([usernamePassword(credentialsId: params.GITOPS_CREDENTIALS_ID, usernameVariable: 'GITOPS_USERNAME', passwordVariable: 'GITOPS_TOKEN')]) {
+              sh updateCommand
+            }
+          } else {
+            sh updateCommand
+          }
+        }
       }
     }
   }

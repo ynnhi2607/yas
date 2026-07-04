@@ -8,6 +8,8 @@ DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-ynnhi2607}"
 GITOPS_REPO_DIR="${GITOPS_REPO_DIR:-../yas-gitops}"
 GITOPS_REPO_URL="${GITOPS_REPO_URL:-https://github.com/ynnhi2607/yas-gitops.git}"
 PUSH_GITOPS="${PUSH_GITOPS:-false}"
+GITOPS_USERNAME="${GITOPS_USERNAME:-}"
+GITOPS_TOKEN="${GITOPS_TOKEN:-}"
 
 case "$ENVIRONMENT" in
   dev|staging) ;;
@@ -33,11 +35,28 @@ image_repo_for() {
   esac
 }
 
+gitops_auth_url() {
+  if [[ -n "$GITOPS_TOKEN" && "$GITOPS_REPO_URL" == https://* ]]; then
+    local url_without_scheme username
+    url_without_scheme="${GITOPS_REPO_URL#https://}"
+    username="${GITOPS_USERNAME:-x-access-token}"
+    echo "https://${username}:${GITOPS_TOKEN}@${url_without_scheme}"
+  else
+    echo "$GITOPS_REPO_URL"
+  fi
+}
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
+AUTHED_GITOPS_REPO_URL="$(gitops_auth_url)"
+
 if [[ ! -d "$GITOPS_REPO_DIR/.git" ]]; then
-  git clone "$GITOPS_REPO_URL" "$GITOPS_REPO_DIR"
+  git clone "$AUTHED_GITOPS_REPO_URL" "$GITOPS_REPO_DIR"
+fi
+
+if [[ -n "$GITOPS_TOKEN" && "$GITOPS_REPO_URL" == https://* ]]; then
+  git -C "$GITOPS_REPO_DIR" remote set-url origin "$AUTHED_GITOPS_REPO_URL"
 fi
 
 VALUES_FILE="${GITOPS_REPO_DIR}/environments/${ENVIRONMENT}/services/${SERVICE}.yaml"
