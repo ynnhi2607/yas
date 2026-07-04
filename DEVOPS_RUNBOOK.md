@@ -258,6 +258,8 @@ Docker CLI tren Jenkins agent/container
 Maven tren Jenkins agent/container
 SonarScanner tool name: SonarScanner
 SonarQube server config name: SonarQube-Local
+SONAR_ORGANIZATION nen la organization key tren SonarCloud cua nhom
+SONAR_PROJECT_PREFIX nen la prefix project cua nhom, vi du ynnhi2607_yas
 ```
 
 Pipeline co cac stage nang cao:
@@ -269,6 +271,15 @@ Quality scan             SonarQube/SonarCloud scan va quality gate
 Dependency security scan Snyk, chan high severity vulnerabilities
 Build and push images    Docker build/push sau khi cac gate pass
 ```
+
+Sonar project key se duoc override theo service:
+
+```text
+<SONAR_PROJECT_PREFIX>-<service>
+vi du: ynnhi2607_yas-tax
+```
+
+Khong dung project key upstream `nashtech-garage_*`, vi token cua nhom khong co quyen project goc.
 
 Coverage gate:
 

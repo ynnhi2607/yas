@@ -163,7 +163,11 @@ def runGitleaksScan = {
 
 def runBackendSonar = { Map service ->
   withSonarQubeEnv(params.SONARQUBE_ENV) {
-    sh "mvn -pl ${service.context} -am sonar:sonar"
+    sh """
+      mvn -pl ${service.context} -am sonar:sonar \
+        -Dsonar.projectKey=${params.SONAR_PROJECT_PREFIX}-${service.name} \
+        -Dsonar.organization=${params.SONAR_ORGANIZATION}
+    """
   }
 }
 
@@ -171,7 +175,11 @@ def runUiSonar = { Map service ->
   withSonarQubeEnv(params.SONARQUBE_ENV) {
     def scannerHome = tool params.SONAR_SCANNER_TOOL
     dir(service.context) {
-      sh "${scannerHome}/bin/sonar-scanner"
+      sh """
+        ${scannerHome}/bin/sonar-scanner \
+          -Dsonar.projectKey=${params.SONAR_PROJECT_PREFIX}-${service.name} \
+          -Dsonar.organization=${params.SONAR_ORGANIZATION}
+      """
     }
   }
 }
@@ -265,6 +273,8 @@ pipeline {
     booleanParam(name: 'ENABLE_GITLEAKS', defaultValue: true, description: 'Run Gitleaks secret scanning')
     booleanParam(name: 'ENABLE_SONAR', defaultValue: true, description: 'Run SonarQube/SonarCloud quality scan')
     string(name: 'SONARQUBE_ENV', defaultValue: 'SonarQube-Local', description: 'Jenkins SonarQube server config name')
+    string(name: 'SONAR_ORGANIZATION', defaultValue: 'ynnhi2607', description: 'SonarCloud organization key')
+    string(name: 'SONAR_PROJECT_PREFIX', defaultValue: 'ynnhi2607_yas', description: 'Sonar project key prefix, final key is <prefix>-<service>')
     string(name: 'SONAR_SCANNER_TOOL', defaultValue: 'SonarScanner', description: 'Jenkins SonarScanner tool name for frontend services')
     booleanParam(name: 'ENABLE_SNYK', defaultValue: true, description: 'Run Snyk high severity vulnerability scan')
     string(name: 'SNYK_CREDENTIALS_ID', defaultValue: 'snyk-token', description: 'Jenkins secret text credentials id for Snyk token')
