@@ -229,6 +229,7 @@ jenkins/Jenkinsfile.ci_build_images
 Expected:
 
 - Jenkins quet tung branch rieng.
+- Auto trigger nen cau hinh o Multibranch job bang `Periodically if not otherwise run` hoac GitHub webhook, khong dat `pollSCM` trong Jenkinsfile de tranh build trung.
 - Khi push code vao branch, Jenkins chi build service co thay doi theo thu muc monorepo.
 - Vi du sua `tax/...` thi chi test/build/push image `ynnhi2607/yas-tax:<commit-id>`.
 - Neu sua `common-library/...` hoac root `pom.xml` thi build lai cac backend service demo.
@@ -260,6 +261,7 @@ SonarScanner tool name: SonarScanner
 SonarQube server config name: SonarQube-Local
 SONAR_ORGANIZATION nen la organization key tren SonarCloud cua nhom
 SONAR_PROJECT_PREFIX nen la prefix project cua nhom, vi du ynnhi2607_yas
+NODEJS_TOOL nen trung voi NodeJS tool tren Jenkins, mac dinh la node20
 ```
 
 Pipeline co cac stage nang cao:

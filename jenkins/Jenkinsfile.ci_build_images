@@ -130,10 +130,12 @@ def testBackendService = { Map service ->
 }
 
 def testUiService = { Map service ->
-  dir(service.context) {
-    sh 'npm ci'
-    sh 'npm run lint'
-    sh 'npm run build'
+  nodejs(params.NODEJS_TOOL) {
+    dir(service.context) {
+      sh 'npm ci'
+      sh 'npm run lint'
+      sh 'npm run build'
+    }
   }
 }
 
@@ -194,11 +196,13 @@ def runServiceSonar = { Map service ->
 
 def runSnykScan = { Map service ->
   withCredentials([string(credentialsId: params.SNYK_CREDENTIALS_ID, variable: 'SNYK_TOKEN')]) {
-    dir(service.context) {
-      sh '''
-        export SNYK_TOKEN="$SNYK_TOKEN"
-        npx snyk test --severity-threshold=high
-      '''
+    nodejs(params.NODEJS_TOOL) {
+      dir(service.context) {
+        sh '''
+          export SNYK_TOKEN="$SNYK_TOKEN"
+          npx snyk test --severity-threshold=high
+        '''
+      }
     }
   }
 }
@@ -254,11 +258,6 @@ def updateGitOpsImage = { String environmentName, Map service, String imageTag -
 pipeline {
   agent any
 
-  triggers {
-    githubPush()
-    pollSCM('H/2 * * * *')
-  }
-
   parameters {
     string(name: 'DOCKERHUB_USERNAME', defaultValue: 'ynnhi2607', description: 'Docker Hub username/org')
     string(name: 'DOCKERHUB_CREDENTIALS_ID', defaultValue: 'dockerhub', description: 'Jenkins username/password credentials id')
@@ -276,6 +275,7 @@ pipeline {
     string(name: 'SONAR_ORGANIZATION', defaultValue: 'ynnhi2607', description: 'SonarCloud organization key')
     string(name: 'SONAR_PROJECT_PREFIX', defaultValue: 'ynnhi2607_yas', description: 'Sonar project key prefix, final key is <prefix>-<service>')
     string(name: 'SONAR_SCANNER_TOOL', defaultValue: 'SonarScanner', description: 'Jenkins SonarScanner tool name for frontend services')
+    string(name: 'NODEJS_TOOL', defaultValue: 'node20', description: 'Jenkins NodeJS tool name')
     booleanParam(name: 'ENABLE_SNYK', defaultValue: true, description: 'Run Snyk high severity vulnerability scan')
     string(name: 'SNYK_CREDENTIALS_ID', defaultValue: 'snyk-token', description: 'Jenkins secret text credentials id for Snyk token')
   }
