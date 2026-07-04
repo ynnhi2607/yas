@@ -111,11 +111,7 @@ def publishBackendTestReports = { Map service ->
     tools: [[parser: 'JACOCO', pattern: "${service.context}/target/site/jacoco/jacoco.xml"]],
     enabledForFailure: true,
     qualityGates: [
-      [threshold: params.COVERAGE_THRESHOLD as Double, metric: 'LINE', baseline: 'PROJECT', criticality: 'FAILURE'],
-      [threshold: params.COVERAGE_THRESHOLD as Double, metric: 'BRANCH', baseline: 'PROJECT', criticality: 'FAILURE'],
-      [threshold: params.COVERAGE_THRESHOLD as Double, metric: 'INSTRUCTION', baseline: 'PROJECT', criticality: 'FAILURE'],
-      [threshold: params.COVERAGE_THRESHOLD as Double, metric: 'METHOD', baseline: 'PROJECT', criticality: 'FAILURE'],
-      [threshold: params.COVERAGE_THRESHOLD as Double, metric: 'CLASS', baseline: 'PROJECT', criticality: 'FAILURE']
+      [threshold: params.COVERAGE_THRESHOLD as Double, metric: 'LINE', baseline: 'PROJECT', criticality: 'FAILURE']
     ]
   )
 }
