@@ -198,10 +198,20 @@ def runSnykScan = { Map service ->
   withCredentials([string(credentialsId: params.SNYK_CREDENTIALS_ID, variable: 'SNYK_TOKEN')]) {
     nodejs(params.NODEJS_TOOL) {
       dir(service.context) {
-        sh '''
+        def snykStatus = sh(
+          script: '''
           export SNYK_TOKEN="$SNYK_TOKEN"
           npx snyk test --severity-threshold=high
-        '''
+          ''',
+          returnStatus: true
+        )
+
+        if (snykStatus != 0) {
+          if (params.SNYK_FAIL_ON_ISSUES) {
+            error("Snyk found high severity vulnerabilities in ${service.name}.")
+          }
+          unstable("Snyk found high severity vulnerabilities in ${service.name}; continuing because SNYK_FAIL_ON_ISSUES=false.")
+        }
       }
     }
   }
@@ -277,6 +287,7 @@ pipeline {
     string(name: 'SONAR_SCANNER_TOOL', defaultValue: 'SonarScanner', description: 'Jenkins SonarScanner tool name for frontend services')
     string(name: 'NODEJS_TOOL', defaultValue: 'node20', description: 'Jenkins NodeJS tool name')
     booleanParam(name: 'ENABLE_SNYK', defaultValue: true, description: 'Run Snyk high severity vulnerability scan')
+    booleanParam(name: 'SNYK_FAIL_ON_ISSUES', defaultValue: false, description: 'Fail pipeline when Snyk finds high severity vulnerabilities')
     string(name: 'SNYK_CREDENTIALS_ID', defaultValue: 'snyk-token', description: 'Jenkins secret text credentials id for Snyk token')
   }
 

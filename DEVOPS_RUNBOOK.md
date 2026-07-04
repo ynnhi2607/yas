@@ -270,8 +270,16 @@ Pipeline co cac stage nang cao:
 Secret scan              Gitleaks, chan neu phat hien secret
 Test selected services   Maven test/Jacoco hoac Next.js lint/build
 Quality scan             SonarQube/SonarCloud scan va quality gate
-Dependency security scan Snyk, chan high severity vulnerabilities
+Dependency security scan Snyk, bao high severity vulnerabilities
 Build and push images    Docker build/push sau khi cac gate pass
+```
+
+Snyk:
+
+```text
+ENABLE_SNYK=true
+SNYK_FAIL_ON_ISSUES=false  # mac dinh: van scan, neu co high vuln thi mark unstable nhung cho build tiep
+SNYK_FAIL_ON_ISSUES=true   # demo security gate fail khi co high vuln
 ```
 
 Sonar project key se duoc override theo service:
