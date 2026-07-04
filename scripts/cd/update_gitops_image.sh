@@ -67,24 +67,8 @@ fi
 
 IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-$(image_repo_for "$SERVICE")}"
 
-python3 - "$VALUES_FILE" "$SERVICE" "$IMAGE_REPOSITORY" "$IMAGE_TAG" <<'PY'
-import sys
-from pathlib import Path
-import yaml
-
-path = Path(sys.argv[1])
-service = sys.argv[2]
-repository = sys.argv[3]
-tag = sys.argv[4]
-
-data = yaml.safe_load(path.read_text()) or {}
-root_key = "ui" if service in {"storefront-ui", "backoffice-ui"} else "backend"
-data.setdefault(root_key, {}).setdefault("image", {})
-data[root_key]["image"]["repository"] = repository
-data[root_key]["image"]["tag"] = tag
-
-path.write_text(yaml.safe_dump(data, sort_keys=False))
-PY
+sed -i "s#^\\([[:space:]]*repository:\\).*#\\1 ${IMAGE_REPOSITORY}#" "$VALUES_FILE"
+sed -i "s#^\\([[:space:]]*tag:\\).*#\\1 ${IMAGE_TAG}#" "$VALUES_FILE"
 
 git -C "$GITOPS_REPO_DIR" add "$VALUES_FILE"
 
