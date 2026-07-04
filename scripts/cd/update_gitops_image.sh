@@ -10,6 +10,8 @@ GITOPS_REPO_URL="${GITOPS_REPO_URL:-https://github.com/ynnhi2607/yas-gitops.git}
 PUSH_GITOPS="${PUSH_GITOPS:-false}"
 GITOPS_USERNAME="${GITOPS_USERNAME:-}"
 GITOPS_TOKEN="${GITOPS_TOKEN:-}"
+GITOPS_COMMIT_USER="${GITOPS_COMMIT_USER:-jenkins-bot}"
+GITOPS_COMMIT_EMAIL="${GITOPS_COMMIT_EMAIL:-jenkins@local}"
 
 case "$ENVIRONMENT" in
   dev|staging) ;;
@@ -59,6 +61,10 @@ if [[ -n "$GITOPS_TOKEN" && "$GITOPS_REPO_URL" == https://* ]]; then
   git -C "$GITOPS_REPO_DIR" remote set-url origin "$AUTHED_GITOPS_REPO_URL"
 fi
 
+git -C "$GITOPS_REPO_DIR" fetch origin main
+git -C "$GITOPS_REPO_DIR" checkout main
+git -C "$GITOPS_REPO_DIR" pull --ff-only origin main
+
 VALUES_FILE_RELATIVE="environments/${ENVIRONMENT}/services/${SERVICE}.yaml"
 VALUES_FILE="${GITOPS_REPO_DIR}/${VALUES_FILE_RELATIVE}"
 if [[ ! -f "$VALUES_FILE" ]]; then
@@ -78,6 +84,8 @@ if git -C "$GITOPS_REPO_DIR" diff --cached --quiet; then
   exit 0
 fi
 
+git -C "$GITOPS_REPO_DIR" config user.name "$GITOPS_COMMIT_USER"
+git -C "$GITOPS_REPO_DIR" config user.email "$GITOPS_COMMIT_EMAIL"
 git -C "$GITOPS_REPO_DIR" commit -m "Deploy ${SERVICE}:${IMAGE_TAG} to ${ENVIRONMENT}"
 
 if [[ "$PUSH_GITOPS" == "true" ]]; then

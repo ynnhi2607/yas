@@ -124,6 +124,38 @@ def buildAndPushImage = { Map service, String commitTag, String branchName ->
   echo "Pushed image: ${image}"
 }
 
+def retagAndPushImage = { Map service, String sourceTag, String targetTag ->
+  def sourceImage = "${env.DOCKERHUB_USERNAME}/${service.image}:${sourceTag}"
+  def targetImage = "${env.DOCKERHUB_USERNAME}/${service.image}:${targetTag}"
+
+  sh "docker pull ${sourceImage}"
+  sh "docker tag ${sourceImage} ${targetImage}"
+  sh "docker push ${targetImage}"
+
+  echo "Retagged image: ${sourceImage} -> ${targetImage}"
+}
+
+def updateGitOpsImage = { String environmentName, Map service, String imageTag ->
+  withCredentials([string(credentialsId: params.GITOPS_CREDENTIALS_ID, variable: 'GITOPS_TOKEN')]) {
+    withEnv([
+      "ENVIRONMENT=${environmentName}",
+      "SERVICE=${service.name}",
+      "IMAGE_TAG=${imageTag}",
+      "DOCKERHUB_USERNAME=${params.DOCKERHUB_USERNAME}",
+      "GITOPS_REPO_URL=${params.GITOPS_REPO_URL}",
+      "GITOPS_REPO_DIR=${params.GITOPS_REPO_DIR}",
+      "PUSH_GITOPS=${params.PUSH_GITOPS}",
+      "GITOPS_COMMIT_USER=${params.GITOPS_COMMIT_USER}",
+      "GITOPS_COMMIT_EMAIL=${params.GITOPS_COMMIT_EMAIL}"
+    ]) {
+      sh '''
+        chmod +x scripts/cd/update_gitops_image.sh
+        ./scripts/cd/update_gitops_image.sh
+      '''
+    }
+  }
+}
+
 pipeline {
   agent any
 
@@ -136,6 +168,12 @@ pipeline {
     string(name: 'DOCKERHUB_USERNAME', defaultValue: 'ynnhi2607', description: 'Docker Hub username/org')
     string(name: 'DOCKERHUB_CREDENTIALS_ID', defaultValue: 'dockerhub', description: 'Jenkins username/password credentials id')
     booleanParam(name: 'BUILD_ALL', defaultValue: false, description: 'Force build all demo services')
+    string(name: 'GITOPS_REPO_URL', defaultValue: 'https://github.com/ynnhi2607/yas-gitops.git', description: 'GitOps repository URL')
+    string(name: 'GITOPS_REPO_DIR', defaultValue: '../yas-gitops', description: 'Local GitOps checkout path inside Jenkins workspace')
+    string(name: 'GITOPS_CREDENTIALS_ID', defaultValue: 'github-token', description: 'Jenkins secret text credentials id for GitOps repo')
+    string(name: 'GITOPS_COMMIT_USER', defaultValue: 'jenkins-bot', description: 'Git author name for GitOps commits')
+    string(name: 'GITOPS_COMMIT_EMAIL', defaultValue: 'jenkins@local', description: 'Git author email for GitOps commits')
+    booleanParam(name: 'PUSH_GITOPS', defaultValue: true, description: 'Push GitOps changes to origin/main')
   }
 
   environment {
@@ -153,14 +191,15 @@ pipeline {
       steps {
         script {
           env.COMMIT_TAG = sh(returnStdout: true, script: 'git rev-parse --short=8 HEAD').trim()
-          env.CURRENT_BRANCH = env.BRANCH_NAME ?: sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
+          env.CURRENT_BRANCH = env.TAG_NAME ?: (env.BRANCH_NAME ?: sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim())
 
           def changedFiles = resolveChangedFiles()
           echo "Current branch: ${env.CURRENT_BRANCH}"
+          echo "Release tag: ${env.TAG_NAME ?: 'none'}"
           echo "Commit tag: ${env.COMMIT_TAG}"
           echo "Changed files:\n${changedFiles.join('\n')}"
 
-          def selectedServices = params.BUILD_ALL ? allServices.collect { it.name } : resolveServicesToBuild(changedFiles)
+          def selectedServices = ((env.TAG_NAME ?: '') ==~ /^v.*/) ? allServices.collect { it.name } : (params.BUILD_ALL ? allServices.collect { it.name } : resolveServicesToBuild(changedFiles))
           env.SELECTED_SERVICES = selectedServices.join(',')
 
           echo "Services to build: ${env.SELECTED_SERVICES ?: 'none'}"
@@ -195,13 +234,47 @@ pipeline {
 
     stage('Build and push images') {
       when {
-        expression { env.SELECTED_SERVICES?.trim() }
+        allOf {
+          expression { env.SELECTED_SERVICES?.trim() }
+          expression { !((env.TAG_NAME ?: '') ==~ /^v.*/) }
+        }
       }
       steps {
         script {
           env.SELECTED_SERVICES.split(',').findAll { it?.trim() }.each { serviceName ->
             def service = serviceConfig(serviceName.trim())
             buildAndPushImage(service, env.COMMIT_TAG, env.CURRENT_BRANCH)
+          }
+        }
+      }
+    }
+
+    stage('CD Dev GitOps update') {
+      when {
+        allOf {
+          expression { env.SELECTED_SERVICES?.trim() }
+          expression { env.CURRENT_BRANCH == 'main' || env.CURRENT_BRANCH == 'master' }
+        }
+      }
+      steps {
+        script {
+          env.SELECTED_SERVICES.split(',').findAll { it?.trim() }.each { serviceName ->
+            def service = serviceConfig(serviceName.trim())
+            updateGitOpsImage('dev', service, env.COMMIT_TAG)
+          }
+        }
+      }
+    }
+
+    stage('CD Staging GitOps update') {
+      when {
+        expression { (env.TAG_NAME ?: '') ==~ /^v.*/ }
+      }
+      steps {
+        script {
+          allServices.each { service ->
+            retagAndPushImage(service, 'main', env.TAG_NAME)
+            updateGitOpsImage('staging', service, env.TAG_NAME)
           }
         }
       }
