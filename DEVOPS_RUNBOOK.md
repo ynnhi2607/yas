@@ -26,8 +26,26 @@ Chay trong WSL tai thu muc repo:
 cd ~/KHTN/devops/yas
 minikube start
 kubectl get pods -A
-```
+kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 31788:80 --address 0.0.0.0
 
+MEDIA_POD=$(kubectl get pods -n yas -l app.kubernetes.io/instance=media -o jsonpath='{.items[0].metadata.name}')
+kubectl cp sampledata/images yas/$MEDIA_POD:/images
+```
+```bash
+Để mở ArgoCD UI:
+kubectl port-forward svc/argocd-server -n argocd 8081:443
+Mở:
+https://localhost:8081
+Lấy password:
+kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 --decode
+User:
+admin
+```
+```bash
+netsh interface portproxy delete v4tov4 listenaddress=127.0.0.1 listenport=80
+netsh interface portproxy add v4tov4 listenaddress=127.0.0.1 listenport=80 connectaddress=127.0.0.1 connectport=31788
+netsh interface portproxy show all
+```
 Doi cac pod quan trong ve `Running` hoac `Completed`.
 
 Kiem tra nhanh namespace chinh:
@@ -199,6 +217,102 @@ Deploy lai YAS configuration:
 helm upgrade --install yas-configuration k8s/charts/yas-configuration --namespace yas
 kubectl rollout restart deployment/storefront-bff deployment/backoffice-bff -n yas
 ```
+
+## CI Jenkins theo yeu cau do an 1
+
+Job Jenkins nen tao dang `Multibranch Pipeline` va tro toi file:
+
+```text
+jenkins/Jenkinsfile.ci_build_images
+```
+
+Expected:
+
+- Jenkins quet tung branch rieng.
+- Khi push code vao branch, Jenkins chi build service co thay doi theo thu muc monorepo.
+- Vi du sua `tax/...` thi chi test/build/push image `ynnhi2607/yas-tax:<commit-id>`.
+- Neu sua `common-library/...` hoac root `pom.xml` thi build lai cac backend service demo.
+- Phase `Test selected services` chay test backend, upload JUnit report va Jacoco coverage.
+- Phase `Build and push images` build Docker image va push len Docker Hub voi tag la short commit id.
+- Khi branch `main` chay thanh cong, pipeline push them tag `main/latest` va update GitOps `dev`.
+- Khi build tag release `v*`, pipeline retag image `main` thanh release tag va update GitOps `staging`.
+
+Credential can co tren Jenkins:
+
+```text
+dockerhub      username/password Docker Hub
+github-token   secret text GitHub token co quyen push repo yas-gitops
+snyk-token     secret text Snyk token
+```
+
+Plugin/tool nen co tren Jenkins cho do an 1:
+
+```text
+JUnit plugin
+Coverage plugin
+SonarQube Scanner plugin
+NodeJS plugin
+Pipeline plugin
+Git plugin
+Docker CLI tren Jenkins agent/container
+Maven tren Jenkins agent/container
+SonarScanner tool name: SonarScanner
+SonarQube server config name: SonarQube-Local
+```
+
+Pipeline co cac stage nang cao:
+
+```text
+Secret scan              Gitleaks, chan neu phat hien secret
+Test selected services   Maven test/Jacoco hoac Next.js lint/build
+Quality scan             SonarQube/SonarCloud scan va quality gate
+Dependency security scan Snyk, chan high severity vulnerabilities
+Build and push images    Docker build/push sau khi cac gate pass
+```
+
+Coverage gate:
+
+```text
+COVERAGE_THRESHOLD=70.0
+```
+
+Neu test service nao chua dat coverage 70%, Jenkins se fail o phase `Test selected services`. Khi do tao branch rieng cho service do, viet them unit test, push len branch va de Jenkins chay lai. Vi du:
+
+```bash
+git checkout -b test/tax-coverage
+# them unit test trong tax/src/test/...
+git push origin test/tax-coverage
+```
+
+## GitHub branch protection cho main
+
+Phan nay cau hinh tren GitHub UI, khong nam trong Jenkinsfile.
+
+Vao repo GitHub:
+
+```text
+Settings -> Branches -> Add branch protection rule
+```
+
+Cau hinh:
+
+```text
+Branch name pattern: main
+Require a pull request before merging: ON
+Required approvals: 2
+Require status checks to pass before merging: ON
+Require branches to be up to date before merging: ON
+Chon status check cua Jenkins ci_build_images/main hoac ten check Jenkins tao ra
+Do not allow bypassing the above settings: ON neu thay co option nay
+```
+
+Expected khi test:
+
+- Push truc tiep vao `main` bi chan neu GitHub da bat rule.
+- Tao PR tu feature branch vao `main`.
+- PR can 2 reviewer approve.
+- PR can Jenkins CI pass.
+- Sau khi merge vao `main`, Jenkins main build image va ArgoCD cap nhat `yas-dev`.
 
 Deploy lai Kafka chart:
 
