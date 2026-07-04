@@ -277,7 +277,8 @@ Build and push images    Docker build/push sau khi cac gate pass
 Snyk:
 
 ```text
-ENABLE_SNYK=true
+ENABLE_SNYK=false           # mac dinh de CI demo xanh
+ENABLE_SNYK=true            # bat khi can chup minh chung Snyk scan
 SNYK_FAIL_ON_ISSUES=false  # mac dinh: van scan, neu co high vuln thi mark unstable nhung cho build tiep
 SNYK_FAIL_ON_ISSUES=true   # demo security gate fail khi co high vuln
 ```
