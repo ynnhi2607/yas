@@ -104,7 +104,7 @@ def prepareJava21Build = {
 }
 
 def publishBackendTestReports = { Map service ->
-  junit testResults: "${service.context}/target/surefire-reports/*.xml", allowEmptyResults: true
+  junit testResults: "${service.context}/target/surefire-reports/*.xml,${service.context}/target/failsafe-reports/*.xml", allowEmptyResults: true
   recordCoverage(
     id: "coverage-${service.name}",
     name: "Coverage: ${service.name}",
@@ -197,21 +197,20 @@ def runServiceSonar = { Map service ->
 def runSnykScan = { Map service ->
   withCredentials([string(credentialsId: params.SNYK_CREDENTIALS_ID, variable: 'SNYK_TOKEN')]) {
     nodejs(params.NODEJS_TOOL) {
-      dir(service.context) {
-        def snykStatus = sh(
-          script: '''
+      def snykStatus = sh(
+        script: """
           export SNYK_TOKEN="$SNYK_TOKEN"
-          npx snyk test --severity-threshold=high
-          ''',
-          returnStatus: true
-        )
+          cd ${service.context}
+          npx snyk test --severity-threshold=high --project-name=yas-${service.name}
+        """,
+        returnStatus: true
+      )
 
-        if (snykStatus != 0) {
-          if (params.SNYK_FAIL_ON_ISSUES) {
-            error("Snyk found high severity vulnerabilities in ${service.name}.")
-          }
-          unstable("Snyk found high severity vulnerabilities in ${service.name}; continuing because SNYK_FAIL_ON_ISSUES=false.")
+      if (snykStatus != 0) {
+        if (params.SNYK_FAIL_ON_ISSUES) {
+          error("Snyk found high severity vulnerabilities in ${service.name}.")
         }
+        unstable("Snyk found high severity vulnerabilities in ${service.name}; continuing because SNYK_FAIL_ON_ISSUES=false.")
       }
     }
   }

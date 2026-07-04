@@ -283,6 +283,21 @@ SNYK_FAIL_ON_ISSUES=true    # mac dinh: fail pipeline neu con high vulnerability
 SNYK_FAIL_ON_ISSUES=false   # chi dung tam neu muon chup report Snyk nhung khong chan build
 ```
 
+Voi backend Maven multi-module, Jenkins test/build truoc bang root Maven:
+
+```bash
+mvn clean install jacoco:report -pl <service> -am
+```
+
+Sau do Snyk moi chay trong folder service:
+
+```bash
+cd <service>
+npx snyk test --severity-threshold=high --project-name=yas-<service>
+```
+
+Ly do: test/build tu root giup Maven resolve parent/common-library, con scan trong folder service giup Snyk khong scan lan sang service khac trong monorepo.
+
 Sonar project key se duoc override theo service:
 
 ```text
