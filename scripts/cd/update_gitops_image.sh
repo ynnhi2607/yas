@@ -59,7 +59,8 @@ if [[ -n "$GITOPS_TOKEN" && "$GITOPS_REPO_URL" == https://* ]]; then
   git -C "$GITOPS_REPO_DIR" remote set-url origin "$AUTHED_GITOPS_REPO_URL"
 fi
 
-VALUES_FILE="${GITOPS_REPO_DIR}/environments/${ENVIRONMENT}/services/${SERVICE}.yaml"
+VALUES_FILE_RELATIVE="environments/${ENVIRONMENT}/services/${SERVICE}.yaml"
+VALUES_FILE="${GITOPS_REPO_DIR}/${VALUES_FILE_RELATIVE}"
 if [[ ! -f "$VALUES_FILE" ]]; then
   echo "GitOps values file not found: ${VALUES_FILE}" >&2
   exit 1
@@ -70,7 +71,7 @@ IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-$(image_repo_for "$SERVICE")}"
 sed -i "s#^\\([[:space:]]*repository:\\).*#\\1 ${IMAGE_REPOSITORY}#" "$VALUES_FILE"
 sed -i "s#^\\([[:space:]]*tag:\\).*#\\1 ${IMAGE_TAG}#" "$VALUES_FILE"
 
-git -C "$GITOPS_REPO_DIR" add "$VALUES_FILE"
+git -C "$GITOPS_REPO_DIR" add "$VALUES_FILE_RELATIVE"
 
 if git -C "$GITOPS_REPO_DIR" diff --cached --quiet; then
   echo "No GitOps change for ${SERVICE} in ${ENVIRONMENT}."
