@@ -164,6 +164,7 @@ def runBackendSonar = { Map service ->
     sh """
       mvn -pl ${service.context} -am sonar:sonar \
         -Dsonar.projectKey=${params.SONAR_PROJECT_PREFIX}-${service.name} \
+        -Dsonar.projectName=yas-${service.name} \
         -Dsonar.organization=${params.SONAR_ORGANIZATION}
     """
   }
@@ -176,6 +177,7 @@ def runUiSonar = { Map service ->
       sh """
         ${scannerHome}/bin/sonar-scanner \
           -Dsonar.projectKey=${params.SONAR_PROJECT_PREFIX}-${service.name} \
+          -Dsonar.projectName=yas-${service.name} \
           -Dsonar.organization=${params.SONAR_ORGANIZATION}
       """
     }
@@ -393,7 +395,15 @@ pipeline {
             def service = serviceConfig(serviceName.trim())
             runServiceSonar(service)
             timeout(time: 5, unit: 'MINUTES') {
-              waitForQualityGate abortPipeline: true
+              def qualityGate = waitForQualityGate abortPipeline: false
+              if (qualityGate.status == 'ERROR' || qualityGate.status == 'FAILED') {
+                error("Sonar quality gate failed for ${service.name}: ${qualityGate.status}")
+              }
+              if (qualityGate.status == 'NONE') {
+                echo "Sonar quality gate is NONE for ${service.name}. Analysis succeeded, but SonarCloud did not compute a gate for this service project yet."
+              } else {
+                echo "Sonar quality gate for ${service.name}: ${qualityGate.status}"
+              }
             }
           }
         }
