@@ -193,20 +193,26 @@ def runServiceSonar = { Map service ->
 def runSnykScan = { Map service ->
   withCredentials([string(credentialsId: params.SNYK_CREDENTIALS_ID, variable: 'SNYK_TOKEN')]) {
     nodejs(params.NODEJS_TOOL) {
-      def snykStatus = sh(
-        script: '''
-          export SNYK_TOKEN="${SNYK_TOKEN}"
-          cd ''' + service.context + '''
-          npx snyk test --severity-threshold=high --project-name=yas-''' + service.name + '''
-        ''',
-        returnStatus: true
-      )
-
-      if (snykStatus != 0) {
-        if (params.SNYK_FAIL_ON_ISSUES) {
-          error("Snyk scan failed or found high severity vulnerabilities in ${service.name}.")
+      if (backendServices.find { it.name == service.name }) {
+        sh '''
+          npx snyk test --file=pom.xml --maven-aggregate-project --severity-threshold=high
+        '''
+        if (env.BRANCH_NAME == 'main') {
+          sh '''
+            npx snyk monitor --file=pom.xml --maven-aggregate-project
+          '''
         }
-        unstable("Snyk scan failed or found high severity vulnerabilities in ${service.name}; continuing because SNYK_FAIL_ON_ISSUES=false.")
+      } else {
+        dir(service.context) {
+          sh '''
+            npx snyk test --severity-threshold=high
+          '''
+          if (env.BRANCH_NAME == 'main') {
+            sh '''
+              npx snyk monitor
+            '''
+          }
+        }
       }
     }
   }
@@ -282,7 +288,6 @@ pipeline {
     string(name: 'SONAR_SCANNER_TOOL', defaultValue: 'SonarScanner', description: 'Jenkins SonarScanner tool name for frontend services')
     string(name: 'NODEJS_TOOL', defaultValue: 'node20', description: 'Jenkins NodeJS tool name')
     booleanParam(name: 'ENABLE_SNYK', defaultValue: true, description: 'Run Snyk high severity vulnerability scan')
-    booleanParam(name: 'SNYK_FAIL_ON_ISSUES', defaultValue: false, description: 'Fail pipeline when Snyk fails or finds high severity vulnerabilities')
     string(name: 'SNYK_CREDENTIALS_ID', defaultValue: 'snyk-token', description: 'Jenkins secret text credentials id for Snyk token')
   }
 
