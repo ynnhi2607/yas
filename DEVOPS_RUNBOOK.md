@@ -223,8 +223,10 @@ kubectl rollout restart deployment/storefront-bff deployment/backoffice-bff -n y
 Job Jenkins nen tao dang `Multibranch Pipeline` va tro toi file:
 
 ```text
-jenkins/Jenkinsfile.ci_build_images
+Jenkinsfile
 ```
+
+Thu muc `jenkins/` van giu cac Jenkinsfile cu de cac job da tao truoc do khong bi gay. Khi tao job moi hoac demo, uu tien dung cac file o root repo: `Jenkinsfile`, `Jenkinsfile.build`, `Jenkinsfile.destroy`.
 
 Expected:
 
@@ -368,11 +370,13 @@ docs/CD_JENKINS_RUNBOOK.md
 File quan trong:
 
 ```text
-jenkins/Jenkinsfile.developer_build
-jenkins/Jenkinsfile.delete_developer_env
+Jenkinsfile.build
+Jenkinsfile.destroy
 scripts/cd/developer_build.sh
 scripts/cd/delete_developer_env.sh
 ```
+
+Neu Jenkins job cu dang tro toi `jenkins/Jenkinsfile.developer_build` hoac `jenkins/Jenkinsfile.delete_developer_env` thi van chay duoc. Job moi nen tro toi file root cho gon va dung format demo.
 
 Chay thu CD local:
 

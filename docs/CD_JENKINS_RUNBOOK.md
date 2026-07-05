@@ -128,16 +128,12 @@ Cau hinh:
 Neu chi dung Jenkins cho CD, dung:
 
 ```text
-jenkins/Jenkinsfile.developer_build
+Jenkinsfile.build
 ```
 
-Neu muon Jenkins lam ca build image, push Docker Hub, va deploy K8S, dung:
+File `jenkins/Jenkinsfile.full_ci_cd` la pipeline legacy. Neu can demo theo de, uu tien dung `Jenkinsfile` cho CI va `Jenkinsfile.build` cho CD.
 
-```text
-jenkins/Jenkinsfile.full_ci_cd
-```
-
-Voi `Jenkinsfile.full_ci_cd`, tao Jenkins credential:
+Tao Jenkins credential:
 
 - Kind: Username with password
 - ID: `dockerhub`
@@ -272,7 +268,7 @@ Cau hinh:
 - Script Path:
 
 ```text
-jenkins/Jenkinsfile.delete_developer_env
+Jenkinsfile.destroy
 ```
 
 Parameters:
