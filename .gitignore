@@ -19,6 +19,7 @@
 *.tar.gz
 *.rar
 target
+.m2/
 
 ### IntelliJ IDEA ###
 .idea
