@@ -28,12 +28,21 @@ uiServices.each { service ->
 }
 
 def resolveChangedFiles = {
-  def previousCommit = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?: ''
-  if (previousCommit) {
-    return sh(
-      script: "git diff --name-only ${previousCommit} HEAD",
-      returnStdout: true
-    ).trim().readLines().findAll { it?.trim() }
+  def currentBranch = env.TAG_NAME ?: (env.BRANCH_NAME ?: sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim())
+  def baseBranch = env.CHANGE_TARGET ?: 'main'
+
+  if (!(currentBranch == 'main' || currentBranch == 'master') && !env.TAG_NAME) {
+    def fetchStatus = sh(
+      script: "git fetch origin ${baseBranch}:refs/remotes/origin/${baseBranch} --depth=50",
+      returnStatus: true
+    )
+    if (fetchStatus == 0) {
+      return sh(
+        script: "git diff --name-only origin/${baseBranch} HEAD",
+        returnStdout: true
+      ).trim().readLines().findAll { it?.trim() }
+    }
+    echo "Could not fetch origin/${baseBranch}; falling back to last commit diff."
   }
 
   def hasParent = sh(script: 'git rev-parse HEAD~1 >/dev/null 2>&1', returnStatus: true) == 0
