@@ -231,24 +231,24 @@ def runSnykScan = { Map service ->
 }
 
 def buildAndPushImage = { Map service, String commitTag, String branchName ->
-  def image = "${env.DOCKERHUB_USERNAME}/${service.image}:${commitTag}"
+  def image = "${params.DOCKERHUB_USERNAME}/${service.image}:${commitTag}"
 
   sh "docker build -t ${image} ${service.context}"
   sh "docker push ${image}"
 
   if (branchName == 'main' || branchName == 'master') {
-    sh "docker tag ${image} ${env.DOCKERHUB_USERNAME}/${service.image}:latest"
-    sh "docker push ${env.DOCKERHUB_USERNAME}/${service.image}:latest"
-    sh "docker tag ${image} ${env.DOCKERHUB_USERNAME}/${service.image}:main"
-    sh "docker push ${env.DOCKERHUB_USERNAME}/${service.image}:main"
+    sh "docker tag ${image} ${params.DOCKERHUB_USERNAME}/${service.image}:latest"
+    sh "docker push ${params.DOCKERHUB_USERNAME}/${service.image}:latest"
+    sh "docker tag ${image} ${params.DOCKERHUB_USERNAME}/${service.image}:main"
+    sh "docker push ${params.DOCKERHUB_USERNAME}/${service.image}:main"
   }
 
   echo "Pushed image: ${image}"
 }
 
 def retagAndPushImage = { Map service, String sourceTag, String targetTag ->
-  def sourceImage = "${env.DOCKERHUB_USERNAME}/${service.image}:${sourceTag}"
-  def targetImage = "${env.DOCKERHUB_USERNAME}/${service.image}:${targetTag}"
+  def sourceImage = "${params.DOCKERHUB_USERNAME}/${service.image}:${sourceTag}"
+  def targetImage = "${params.DOCKERHUB_USERNAME}/${service.image}:${targetTag}"
 
   sh "docker pull ${sourceImage}"
   sh "docker tag ${sourceImage} ${targetImage}"
