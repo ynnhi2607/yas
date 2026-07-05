@@ -5,7 +5,7 @@
     <parent>
         <groupId>com.yas</groupId>
         <artifactId>yas</artifactId>
-        <version>${revision}</version>
+        <version>1.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>search</artifactId>
@@ -29,6 +29,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents.core5</groupId>
+            <artifactId>httpcore5-h2</artifactId>
+            <version>5.4.2</version>
         </dependency>
         <dependency>
             <groupId>io.opentelemetry.semconv</groupId>

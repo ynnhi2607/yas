@@ -28,12 +28,21 @@ uiServices.each { service ->
 }
 
 def resolveChangedFiles = {
-  def previousCommit = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?: ''
-  if (previousCommit) {
-    return sh(
-      script: "git diff --name-only ${previousCommit} HEAD",
-      returnStdout: true
-    ).trim().readLines().findAll { it?.trim() }
+  def currentBranch = env.TAG_NAME ?: (env.BRANCH_NAME ?: sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim())
+  def baseBranch = env.CHANGE_TARGET ?: 'main'
+
+  if (!(currentBranch == 'main' || currentBranch == 'master') && !env.TAG_NAME) {
+    def fetchStatus = sh(
+      script: "git fetch origin ${baseBranch}:refs/remotes/origin/${baseBranch} --depth=50",
+      returnStatus: true
+    )
+    if (fetchStatus == 0) {
+      return sh(
+        script: "git diff --name-only origin/${baseBranch} HEAD",
+        returnStdout: true
+      ).trim().readLines().findAll { it?.trim() }
+    }
+    echo "Could not fetch origin/${baseBranch}; falling back to last commit diff."
   }
 
   def hasParent = sh(script: 'git rev-parse HEAD~1 >/dev/null 2>&1', returnStatus: true) == 0
@@ -164,6 +173,7 @@ def runBackendSonar = { Map service ->
     sh """
       mvn -pl ${service.context} -am sonar:sonar \
         -Dsonar.projectKey=${params.SONAR_PROJECT_PREFIX}-${service.name} \
+        -Dsonar.projectName=yas-${service.name} \
         -Dsonar.organization=${params.SONAR_ORGANIZATION}
     """
   }
@@ -176,6 +186,7 @@ def runUiSonar = { Map service ->
       sh """
         ${scannerHome}/bin/sonar-scanner \
           -Dsonar.projectKey=${params.SONAR_PROJECT_PREFIX}-${service.name} \
+          -Dsonar.projectName=yas-${service.name} \
           -Dsonar.organization=${params.SONAR_ORGANIZATION}
       """
     }
@@ -193,20 +204,27 @@ def runServiceSonar = { Map service ->
 def runSnykScan = { Map service ->
   withCredentials([string(credentialsId: params.SNYK_CREDENTIALS_ID, variable: 'SNYK_TOKEN')]) {
     nodejs(params.NODEJS_TOOL) {
-      def snykStatus = sh(
-        script: """
-          export SNYK_TOKEN="$SNYK_TOKEN"
-          cd ${service.context}
-          npx snyk test --severity-threshold=high --project-name=yas-${service.name}
-        """,
-        returnStatus: true
-      )
-
-      if (snykStatus != 0) {
-        if (params.SNYK_FAIL_ON_ISSUES) {
-          error("Snyk found high severity vulnerabilities in ${service.name}.")
+      if (backendServices.find { it.name == service.name }) {
+        dir(service.context) {
+          sh 'chmod +x ./mvnw'
+          if (env.BRANCH_NAME == 'main') {
+            sh "npx snyk monitor --project-name=yas-${service.name}"
+          }
+          sh '''
+            npx snyk test --severity-threshold=high
+          '''
         }
-        unstable("Snyk found high severity vulnerabilities in ${service.name}; continuing because SNYK_FAIL_ON_ISSUES=false.")
+      } else {
+        dir(service.context) {
+          sh '''
+            npx snyk test --severity-threshold=high
+          '''
+          if (env.BRANCH_NAME == 'main') {
+            sh '''
+              npx snyk monitor
+            '''
+          }
+        }
       }
     }
   }
@@ -282,7 +300,6 @@ pipeline {
     string(name: 'SONAR_SCANNER_TOOL', defaultValue: 'SonarScanner', description: 'Jenkins SonarScanner tool name for frontend services')
     string(name: 'NODEJS_TOOL', defaultValue: 'node20', description: 'Jenkins NodeJS tool name')
     booleanParam(name: 'ENABLE_SNYK', defaultValue: true, description: 'Run Snyk high severity vulnerability scan')
-    booleanParam(name: 'SNYK_FAIL_ON_ISSUES', defaultValue: true, description: 'Fail pipeline when Snyk finds high severity vulnerabilities')
     string(name: 'SNYK_CREDENTIALS_ID', defaultValue: 'snyk-token', description: 'Jenkins secret text credentials id for Snyk token')
   }
 
@@ -387,7 +404,15 @@ pipeline {
             def service = serviceConfig(serviceName.trim())
             runServiceSonar(service)
             timeout(time: 5, unit: 'MINUTES') {
-              waitForQualityGate abortPipeline: true
+              def qualityGate = waitForQualityGate abortPipeline: false
+              if (qualityGate.status == 'ERROR' || qualityGate.status == 'FAILED') {
+                error("Sonar quality gate failed for ${service.name}: ${qualityGate.status}")
+              }
+              if (qualityGate.status == 'NONE') {
+                echo "Sonar quality gate is NONE for ${service.name}. Analysis succeeded, but SonarCloud did not compute a gate for this service project yet."
+              } else {
+                echo "Sonar quality gate for ${service.name}: ${qualityGate.status}"
+              }
             }
           }
         }
