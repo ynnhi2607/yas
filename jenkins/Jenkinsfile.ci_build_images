@@ -194,12 +194,13 @@ def runSnykScan = { Map service ->
   withCredentials([string(credentialsId: params.SNYK_CREDENTIALS_ID, variable: 'SNYK_TOKEN')]) {
     nodejs(params.NODEJS_TOOL) {
       if (backendServices.find { it.name == service.name }) {
-        sh '''
-          npx snyk test --file=pom.xml --maven-aggregate-project --severity-threshold=high
-        '''
-        if (env.BRANCH_NAME == 'main') {
+        dir(service.context) {
+          sh 'chmod +x ./mvnw'
+          if (env.BRANCH_NAME == 'main') {
+            sh "npx snyk monitor --project-name=yas-${service.name}"
+          }
           sh '''
-            npx snyk monitor --file=pom.xml --maven-aggregate-project
+            npx snyk test --severity-threshold=high
           '''
         }
       } else {
