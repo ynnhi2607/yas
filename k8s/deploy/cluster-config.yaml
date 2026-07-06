@@ -15,8 +15,8 @@ keycloak:
   bootstrapAdmin:
     username: admin
     password: admin
-  backofficeRedirectUrl: http://backoffice.yas.local.com
-  storefrontRedirectUrl: http://storefront.yas.local.com
+  backofficeRedirectUrl: http://backoffice.yas.local.com:31788
+  storefrontRedirectUrl: http://storefront.yas.local.com:31788
 grafana:
   username: admin
   password: admin
