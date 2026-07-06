@@ -33,6 +33,10 @@ if [[ "${DEPLOY_SAMPLEDATA}" == "true" ]]; then
   optional_services+=(sampledata)
 fi
 
+ingress_controller_ip() {
+  kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true
+}
+
 env_name() {
   local service="$1"
   echo "${service^^}_BRANCH" | tr '-' '_'
@@ -135,20 +139,32 @@ build_chart_dependencies() {
 
 deploy_backend_service() {
   local service="$1"
-  local branch tag repo chart
+  local branch tag repo chart ingress_ip
   branch="$(branch_for "$service")"
   tag="$(image_tag_for "$service" "$branch")"
   repo="$(image_repo_for_branch "$service" "$branch")"
   chart="${CHARTS_DIR}/${service}"
+  ingress_ip="$(ingress_controller_ip)"
 
   build_chart_dependencies "$chart"
 
   echo "Deploy ${service}: branch=${branch}, image=${repo}:${tag}"
-  helm upgrade --install "$service" "$chart" \
+  local helm_args=(
+    upgrade --install "$service" "$chart"
     --namespace "$NAMESPACE" \
     --create-namespace \
     --set "backend.image.repository=${repo}" \
     --set "backend.image.tag=${tag}"
+  )
+
+  if [[ -n "$ingress_ip" ]]; then
+    helm_args+=(
+      --set "backend.hostAliases[0].ip=${ingress_ip}"
+      --set "backend.hostAliases[0].hostnames[0]=identity.yas.local.com"
+    )
+  fi
+
+  helm "${helm_args[@]}"
 }
 
 deploy_ui_service() {
