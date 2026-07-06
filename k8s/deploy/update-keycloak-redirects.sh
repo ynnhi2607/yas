@@ -2,14 +2,17 @@
 set -euo pipefail
 set -x
 
-read -rd '' BOOTSTRAP_ADMIN_USERNAME BOOTSTRAP_ADMIN_PASSWORD \
-BACKOFFICE_REDIRECT_URIS STOREFRONT_REDIRECT_URIS \
-< <(yq -r '
+mapfile -t KEYCLOAK_CONFIG < <(yq -r '
   .keycloak.bootstrapAdmin.username,
   .keycloak.bootstrapAdmin.password,
   (.keycloak.backofficeRedirectUrl | map(. + "/*") + ["http://localhost:3000/*", "http://localhost:8087/*"] | to_json),
   (.keycloak.storefrontRedirectUrl | map(. + "/*") + ["http://localhost:8087/*"] | to_json)
 ' ./cluster-config.yaml)
+
+BOOTSTRAP_ADMIN_USERNAME="${KEYCLOAK_CONFIG[0]}"
+BOOTSTRAP_ADMIN_PASSWORD="${KEYCLOAK_CONFIG[1]}"
+BACKOFFICE_REDIRECT_URIS="${KEYCLOAK_CONFIG[2]}"
+STOREFRONT_REDIRECT_URIS="${KEYCLOAK_CONFIG[3]}"
 
 kubectl wait --for=condition=Ready pod/keycloak-0 -n keycloak --timeout=300s
 
