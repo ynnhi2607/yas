@@ -42,7 +42,7 @@ helm upgrade --install swagger-ui ../charts/swagger-ui \
 
 sleep 20
 
-for chart in {"cart","customer","inventory","media","order","product","search","tax","sampledata"} ; do
+for chart in {"cart","customer","inventory","media","order","product","search","tax"} ; do
     helm dependency build ../charts/"$chart"
     helm upgrade --install "$chart" ../charts/"$chart" \
     --namespace yas --create-namespace \
@@ -51,3 +51,11 @@ for chart in {"cart","customer","inventory","media","order","product","search","
     --set backend.hostAliases[0].hostnames[0]="identity.$DOMAIN"
     sleep 60
 done
+
+if [[ "${DEPLOY_SAMPLEDATA:-false}" == "true" ]]; then
+    helm dependency build ../charts/sampledata
+    helm upgrade --install sampledata ../charts/sampledata \
+    --namespace yas --create-namespace \
+    --set backend.hostAliases[0].ip="$INGRESS_CONTROLLER_IP" \
+    --set backend.hostAliases[0].hostnames[0]="identity.$DOMAIN"
+fi
