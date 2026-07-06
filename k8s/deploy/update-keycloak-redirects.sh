@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+set -x
+
+read -rd '' BOOTSTRAP_ADMIN_USERNAME BOOTSTRAP_ADMIN_PASSWORD \
+BACKOFFICE_REDIRECT_URIS STOREFRONT_REDIRECT_URIS \
+< <(yq -r '
+  .keycloak.bootstrapAdmin.username,
+  .keycloak.bootstrapAdmin.password,
+  (.keycloak.backofficeRedirectUrl | map(. + "/*") + ["http://localhost:3000/*", "http://localhost:8087/*"] | to_json),
+  (.keycloak.storefrontRedirectUrl | map(. + "/*") + ["http://localhost:8087/*"] | to_json)
+' ./cluster-config.yaml)
+
+kubectl wait --for=condition=Ready pod/keycloak-0 -n keycloak --timeout=300s
+
+kubectl exec -n keycloak keycloak-0 -- /opt/keycloak/bin/kcadm.sh config credentials \
+  --server http://keycloak-service.keycloak.svc.cluster.local \
+  --realm master \
+  --user "$BOOTSTRAP_ADMIN_USERNAME" \
+  --password "$BOOTSTRAP_ADMIN_PASSWORD"
+
+printf '{"redirectUris":%s}\n' "$BACKOFFICE_REDIRECT_URIS" \
+  | kubectl exec -i -n keycloak keycloak-0 -- /opt/keycloak/bin/kcadm.sh update \
+      clients/26490047-2a91-4938-9324-371523ad1e14 \
+      -r Yas \
+      -f -
+
+printf '{"redirectUris":%s}\n' "$STOREFRONT_REDIRECT_URIS" \
+  | kubectl exec -i -n keycloak keycloak-0 -- /opt/keycloak/bin/kcadm.sh update \
+      clients/4f64c142-0545-44bb-9446-2a18b9c9effd \
+      -r Yas \
+      -f -
+
+kubectl exec -n keycloak keycloak-0 -- /opt/keycloak/bin/kcadm.sh get clients \
+  -r Yas \
+  -q clientId=storefront-bff \
+  --fields clientId,redirectUris
+
+kubectl exec -n keycloak keycloak-0 -- /opt/keycloak/bin/kcadm.sh get clients \
+  -r Yas \
+  -q clientId=backoffice-bff \
+  --fields clientId,redirectUris

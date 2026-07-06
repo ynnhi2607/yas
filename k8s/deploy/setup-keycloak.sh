@@ -27,3 +27,6 @@ helm upgrade --install keycloak ./keycloak/keycloak \
 --set bootstrapAdmin.password="$BOOTSTRAP_ADMIN_PASSWORD" \
 --set-json backofficeRedirectUrl="$KEYCLOAK_BACKOFFICE_REDIRECT_URL" \
 --set-json storefrontRedirectUrl="$KEYCLOAK_STOREFRONT_REDIRECT_URL"
+
+chmod +x ./update-keycloak-redirects.sh
+./update-keycloak-redirects.sh
