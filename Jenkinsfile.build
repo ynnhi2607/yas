@@ -30,6 +30,13 @@ pipeline {
     string(name: 'NAMESPACE', defaultValue: 'yas', description: 'Kubernetes namespace to deploy to')
     string(name: 'DOCKERHUB_USERNAME', defaultValue: 'ynnhi2607', description: 'Docker Hub username/org')
     booleanParam(name: 'DEPLOY_SAMPLEDATA', defaultValue: false, description: 'Run sampledata once when seeding demo data')
+    booleanParam(name: 'UPDATE_GITOPS', defaultValue: false, description: 'Commit selected image tags to the yas-gitops repo for ArgoCD')
+    booleanParam(name: 'PUSH_GITOPS', defaultValue: false, description: 'Push the GitOps commit to origin/main. Keep false for dry run.')
+    choice(name: 'GITOPS_ENVIRONMENT', choices: ['dev', 'staging'], description: 'GitOps environment values to update')
+    string(name: 'GITOPS_REPO_URL', defaultValue: 'https://github.com/ynnhi2607/yas-gitops.git', description: 'GitOps repository URL')
+    string(name: 'GITOPS_REPO_DIR', defaultValue: '../yas-gitops', description: 'Local GitOps checkout path from the Jenkins workspace')
+    string(name: 'GITOPS_CREDENTIALS_ID', defaultValue: 'github-token', description: 'Jenkins Secret text credential with GitHub token')
+    string(name: 'GITOPS_MAIN_TAG', defaultValue: 'latest', description: 'Image tag to write for services that use main')
 
     string(name: 'PRODUCT_BRANCH', defaultValue: 'main', description: 'Branch or commit for product')
     string(name: 'CART_BRANCH', defaultValue: 'main', description: 'Branch or commit for cart')
@@ -113,6 +120,35 @@ pipeline {
           SAMPLEDATA_BRANCH_COMMIT="${SAMPLEDATA_BRANCH_COMMIT:-}" \
           ./scripts/cd/developer_build.sh
         '''
+      }
+    }
+
+    stage('Update GitOps image tags') {
+      when {
+        expression { return params.UPDATE_GITOPS }
+      }
+      steps {
+        withCredentials([string(credentialsId: params.GITOPS_CREDENTIALS_ID, variable: 'GITOPS_TOKEN')]) {
+          sh '''
+            set -a
+            if [ -f .jenkins-deploy-env ]; then
+              . ./.jenkins-deploy-env
+            fi
+            set +a
+
+            chmod +x scripts/cd/update_gitops_images.sh
+            ENVIRONMENT="${GITOPS_ENVIRONMENT}" \
+            DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME}" \
+            MAIN_TAG="${GITOPS_MAIN_TAG}" \
+            GITOPS_REPO_URL="${GITOPS_REPO_URL}" \
+            GITOPS_REPO_DIR="${GITOPS_REPO_DIR}" \
+            PUSH_GITOPS="${PUSH_GITOPS}" \
+            GITOPS_TOKEN="${GITOPS_TOKEN}" \
+            GITOPS_COMMIT_USER="jenkins-bot" \
+            GITOPS_COMMIT_EMAIL="jenkins@local" \
+            ./scripts/cd/update_gitops_images.sh
+          '''
+        }
       }
     }
 

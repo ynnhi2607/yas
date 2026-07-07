@@ -94,30 +94,51 @@ Dùng job CD developer build, job đang trỏ tới:
 Jenkinsfile.build
 ```
 
-Parameter hay dùng:
+Parameter hay dùng hiện tại:
 
 ```text
-BASE_BRANCH=main
-TARGET_SERVICE=<service-can-test>
-TARGET_BRANCH=<branch-cua-service>
-BUILD_BASE_IMAGES=false
-PUSH_LATEST_FOR_BASE=false
+NAMESPACE=yas
+DOCKERHUB_USERNAME=ynnhi2607
+<SERVICE>_BRANCH=<branch-cua-service>
 DEPLOY_SAMPLEDATA=false
+UPDATE_GITOPS=true
+GITOPS_ENVIRONMENT=dev
+PUSH_GITOPS=false
 ```
 
 Ví dụ test branch `fix-tax-demo` cho service `tax`:
 
 ```text
-BASE_BRANCH=main
-TARGET_SERVICE=tax
-TARGET_BRANCH=fix-tax-demo
+TAX_BRANCH=fix-tax-demo
 ```
 
 Kết quả mong đợi:
 
-- Jenkins build image cho service target bằng commit id của branch.
+- Jenkins deploy service `tax` bằng image tag theo commit id của branch.
 - Các service còn lại dùng image có sẵn từ `main/latest`.
 - Console log có dòng image đã push/deploy.
+
+Nếu muốn Jenkins tạo commit sang repo GitOps giống hình `jenkins-bot committed`, bật:
+
+```text
+UPDATE_GITOPS=true
+PUSH_GITOPS=true
+GITOPS_ENVIRONMENT=dev
+```
+
+Jenkins sẽ update các file trong `yas-gitops/environments/dev/services/*.yaml` và commit dạng:
+
+```text
+developer_build: update dev image tags [build #<so-build>]
+```
+
+Người commit sẽ là:
+
+```text
+jenkins-bot <jenkins@local>
+```
+
+Nếu chỉ muốn test thử không đẩy lên GitHub, để `PUSH_GITOPS=false`. Khi đó Jenkins chỉ tạo commit local trong workspace.
 
 ## 5. Kiểm tra trên GCP VM
 
@@ -357,6 +378,7 @@ Nếu cần chạy local có token riêng, chỉ tạo file local `.env` và đ�
 - SonarCloud project dashboard.
 - Snyk scan stage hoặc Snyk dashboard.
 - DockerHub repository có image tag mới.
+- GitOps repo có commit `jenkins-bot` update image tag nếu CD job bật `PUSH_GITOPS=true`.
 - ArgoCD UI: app `Synced Healthy` và cây resource.
 - `kubectl get applications -n argocd`.
 - `kubectl get pods -n yas-dev` và `kubectl get pods -n yas-staging`.
