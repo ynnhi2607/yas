@@ -149,6 +149,15 @@ ArgoCD applications: Synced Healthy
 Pods service: 1/1 Running
 ```
 
+Trạng thái setup hiện tại:
+
+```text
+VM static IP: 34.87.83.182
+Jenkins URL: http://34.87.83.182:8080
+Jenkins container: jenkins-yas
+Jenkins CD job developer_build: đã test success
+```
+
 ## 6. Mở Jenkins cho cả nhóm
 
 Jenkins chạy trên GCP VM nên VM phải đang bật thì cả nhóm mới mở được.
@@ -162,7 +171,7 @@ Compute Engine -> VM instances -> yas-devops-vm -> External IP
 Link Jenkins của nhóm:
 
 ```text
-http://<VM_EXTERNAL_IP>:8080
+http://34.87.83.182:8080
 ```
 
 Nếu VM tắt thì link Jenkins không vào được. Khi bật VM lại, SSH vào VM và kiểm tra:
@@ -207,15 +216,29 @@ Nếu Jenkins hỏi mật khẩu lần đầu:
 docker exec jenkins-yas cat /var/jenkins_home/secrets/initialAdminPassword
 ```
 
-GCP firewall cần mở TCP `8080` để máy thành viên khác truy cập được:
+GCP firewall cần mở TCP `8080` để máy thành viên khác truy cập được, nhưng không mở cho toàn internet.
 
 ```text
-GCP Console -> VPC network -> Firewall -> Create firewall rule
+GCP Console -> VPC network -> Firewall -> allow-jenkins-8080 -> Edit
 Name: allow-jenkins-8080
 Targets: All instances in the network
-Source IPv4 ranges: 0.0.0.0/0
+Source IPv4 ranges: <IP-public-cua-thanh-vien>/32
 Protocols and ports: tcp:8080
 ```
+
+Mỗi thành viên tự lấy IP public tại:
+
+```text
+https://whatismyipaddress.com/
+```
+
+Ví dụ IP public là `115.77.96.10` thì điền:
+
+```text
+115.77.96.10/32
+```
+
+Không dùng `0.0.0.0/0` cho Jenkins vì dễ bị bot scan và Google Cloud báo abuse.
 
 Lưu ý khi dùng chung Jenkins:
 
@@ -233,6 +256,9 @@ Windows hosts file cần trỏ về External IP hiện tại của VM GCP. Ví d
 34.87.83.182 backoffice.yas.local.com
 34.87.83.182 api.yas.local.com
 34.87.83.182 identity.yas.local.com
+34.87.83.182 akhq.yas.local.com
+34.87.83.182 pgadmin.yas.local.com
+34.87.83.182 kibana.yas.local.com
 34.87.83.182 storefront-dev.yas.local.com
 34.87.83.182 backoffice-dev.yas.local.com
 34.87.83.182 api-dev.yas.local.com
@@ -242,6 +268,7 @@ Windows hosts file cần trỏ về External IP hiện tại của VM GCP. Ví d
 ```
 
 Nếu VM dùng IP tạm thời và IP đổi sau khi bật lại, phải sửa các dòng trên sang IP mới.
+Hiện tại IP `34.87.83.182` đã được reserve thành static IP `yas-devops-static-ip`, nên tắt/bật VM không cần đổi hosts nữa.
 
 Link:
 
@@ -254,6 +281,14 @@ http://identity.yas.local.com/admin
 
 Các link demo này cũng cần VM đang bật. Nếu VM tắt thì web YAS, Jenkins và ArgoCD đều không vào được.
 
+Firewall web cũng chỉ nên allow IP nhóm:
+
+```text
+default-allow-http: tcp:80, Source IPv4 ranges = IP từng thành viên dạng /32
+default-allow-https: tcp:443, Source IPv4 ranges = IP từng thành viên dạng /32
+allow-k3s-nodeports: tcp:31788, Source IPv4 ranges = IP từng thành viên dạng /32
+```
+
 ## 8. Mở ArgoCD UI
 
 Trên VM, chạy:
@@ -265,7 +300,7 @@ kubectl port-forward -n argocd svc/argocd-server 8081:443 --address 0.0.0.0
 Mở trên browser:
 
 ```text
-https://<VM_EXTERNAL_IP>:8081
+https://34.87.83.182:8081
 ```
 
 Dùng port `8081` cho ArgoCD để không đụng port `8080` của Jenkins.
@@ -286,7 +321,7 @@ password: kết quả lệnh trên
 
 Vào từng application để xem cây resource ArgoCD và chụp hình cho báo cáo.
 
-Nếu muốn mở ArgoCD từ máy thành viên khác, GCP firewall cũng cần mở TCP `8081`.
+Nếu muốn mở ArgoCD từ máy thành viên khác, GCP firewall cũng cần mở TCP `8081`, và source cũng chỉ nên là IP từng thành viên dạng `/32`.
 
 ## 9. SonarCloud, Snyk, DockerHub
 
