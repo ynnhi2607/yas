@@ -2,6 +2,12 @@
 
 File nay ghi lai cach bat/tat moi lan can demo YAS tren Minikube.
 
+Hướng dẫn cho thành viên cùng nhóm dùng chung Jenkins/GCP nằm ở:
+
+```text
+docs/TEAMMATE_GUIDE.md
+```
+
 ## Link demo
 
 - Storefront: http://storefront.yas.local.com
@@ -226,7 +232,7 @@ Job Jenkins nen tao dang `Multibranch Pipeline` va tro toi file:
 Jenkinsfile
 ```
 
-Thu muc `jenkins/` van giu cac Jenkinsfile cu de cac job da tao truoc do khong bi gay. Khi tao job moi hoac demo, uu tien dung cac file o root repo: `Jenkinsfile`, `Jenkinsfile.build`, `Jenkinsfile.destroy`.
+Thu muc `jenkins/` chi giu `Dockerfile` de build Jenkins agent image. Tat ca Jenkins job moi nen tro toi cac file o root repo: `Jenkinsfile`, `Jenkinsfile.build`, `Jenkinsfile.destroy`.
 
 Expected:
 
@@ -376,7 +382,7 @@ scripts/cd/developer_build.sh
 scripts/cd/delete_developer_env.sh
 ```
 
-Neu Jenkins job cu dang tro toi `jenkins/Jenkinsfile.developer_build` hoac `jenkins/Jenkinsfile.delete_developer_env` thi van chay duoc. Job moi nen tro toi file root cho gon va dung format demo.
+Jenkinsfile legacy da duoc dua vao `docs/jenkins-legacy/` de tham khao. Khong dung cac file legacy nay de tao job demo moi.
 
 Chay thu CD local:
 

@@ -131,7 +131,7 @@ Neu chi dung Jenkins cho CD, dung:
 Jenkinsfile.build
 ```
 
-File `jenkins/Jenkinsfile.full_ci_cd` la pipeline legacy. Neu can demo theo de, uu tien dung `Jenkinsfile` cho CI va `Jenkinsfile.build` cho CD.
+File `docs/jenkins-legacy/Jenkinsfile.full_ci_cd` la pipeline legacy de tham khao. Neu can demo theo de, uu tien dung `Jenkinsfile` cho CI va `Jenkinsfile.build` cho CD.
 
 Tao Jenkins credential:
 
