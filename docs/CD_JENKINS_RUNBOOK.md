@@ -171,6 +171,14 @@ PUSH_GITOPS=true
 
 Jenkins se tu hieu: service `tax` dung branch `dev_tax_service`, cac service con lai lay theo `main` va dung image mac dinh `latest/main`.
 
+Truoc khi chay voi `PUSH_GITOPS=true`, CI phai build va push image cua branch truoc. Vi du `TAX_BRANCH=dev_tax_service` thi DockerHub can co:
+
+```text
+ynnhi2607/yas-tax:<short-commit-id>
+```
+
+Neu image chua ton tai, Jenkins se dung lai truoc khi commit GitOps de tranh ArgoCD deploy pod `ErrImagePull`.
+
 Script se:
 
 1. Resolve commit id cuoi cua branch `dev_tax_service`.
