@@ -324,7 +324,6 @@ Firewall web cũng chỉ nên allow IP nhóm:
 ```text
 default-allow-http: tcp:80, Source IPv4 ranges = IP từng thành viên dạng /32
 default-allow-https: tcp:443, Source IPv4 ranges = IP từng thành viên dạng /32
-allow-k3s-nodeports: tcp:31788, Source IPv4 ranges = IP từng thành viên dạng /32
 ```
 
 ## 8. Mở ArgoCD UI
