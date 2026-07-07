@@ -8,6 +8,12 @@ Hướng dẫn cho thành viên cùng nhóm dùng chung Jenkins/GCP nằm ở:
 docs/TEAMMATE_GUIDE.md
 ```
 
+Hướng dẫn service mesh của Project 02 nằm ở:
+
+```text
+docs/SERVICE_MESH_RUNBOOK.md
+```
+
 ## Link demo
 
 - Storefront: http://storefront.yas.local.com

@@ -7,6 +7,7 @@ Muc tieu:
 - CI build image theo branch va tag bang commit id.
 - CD job `developer_build` cho phep developer chon branch cua tung service.
 - Service nao khong chon branch dev thi dung image mac dinh `latest`.
+- Sau khi deploy, Jenkins co the commit image tag sang GitOps repo de ArgoCD sync.
 - Sau khi deploy, Jenkins in ra link cho developer test.
 - Co job xoa moi truong deploy.
 
@@ -145,11 +146,11 @@ Parameters chinh trong Jenkinsfile:
 - `NAMESPACE`: namespace deploy, mac dinh `yas`
 - `DOCKERHUB_USERNAME`: Docker Hub username/org
 - `DEPLOY_SAMPLEDATA`: bat khi can seed data
-- `BASE_BRANCH`: branch mac dinh cho tat ca service, thuong la `main`
-- `TARGET_SERVICE`: service can build lai, vi du `tax`
-- `TARGET_BRANCH`: branch cua service can test, vi du `dev_tax_service`
-- `BUILD_BASE_IMAGES`: co build lai cac service o `BASE_BRANCH` hay khong, thuong de `false`
-- `PUSH_LATEST_FOR_BASE`: co tag image base thanh `latest` hay khong, thuong de `false`
+- `<SERVICE>_BRANCH`: branch hoac commit cua tung service, vi du `TAX_BRANCH=dev_tax_service`
+- `UPDATE_GITOPS`: tao commit update image tag trong repo GitOps
+- `PUSH_GITOPS`: push commit GitOps len `origin/main`
+- `GITOPS_ENVIRONMENT`: moi truong GitOps can update, `dev` hoac `staging`
+- `GITOPS_CREDENTIALS_ID`: Jenkins Secret text credential chua GitHub token, mac dinh `github-token`
 
 ## 5. Cach deploy branch cua developer
 
@@ -162,12 +163,13 @@ dev_tax_service
 Chay job `developer_build` voi:
 
 ```text
-BASE_BRANCH=main
-TARGET_SERVICE=tax
-TARGET_BRANCH=dev_tax_service
+TAX_BRANCH=dev_tax_service
+UPDATE_GITOPS=true
+GITOPS_ENVIRONMENT=dev
+PUSH_GITOPS=true
 ```
 
-Jenkins se tu hieu: chi build lai service `tax` tu branch `dev_tax_service`, cac service con lai lay theo `BASE_BRANCH=main` va dung image mac dinh `latest/main`.
+Jenkins se tu hieu: service `tax` dung branch `dev_tax_service`, cac service con lai lay theo `main` va dung image mac dinh `latest/main`.
 
 Script se:
 
@@ -179,7 +181,27 @@ ynnhi2607/yas-tax:<short-commit-id>
 ```
 
 3. Deploy cac service con lai bang image mac dinh `latest`.
-4. In ra URL de test.
+4. Commit image tag sang `yas-gitops/environments/dev/services/*.yaml`.
+5. Push commit neu `PUSH_GITOPS=true`.
+6. In ra URL de test.
+
+Commit GitOps co dang:
+
+```text
+developer_build: update dev image tags [build #15]
+```
+
+Commit author:
+
+```text
+jenkins-bot <jenkins@local>
+```
+
+Neu muon chay thu ma khong day len GitHub, de:
+
+```text
+PUSH_GITOPS=false
+```
 
 ## 6. Chay local de test script CD
 
@@ -288,8 +310,9 @@ Nen chup cac man hinh:
 
 - Docker Hub co image tag commit id, vi du `yas-tax:a1b2c3d`.
 - GitHub Actions workflow `CI Demo Images` build/push thanh cong.
-- Jenkins job `developer_build` voi parameter `BASE_BRANCH=main`, `TARGET_SERVICE=tax`, `TARGET_BRANCH=dev_tax_service`.
+- Jenkins job `developer_build` voi parameter `TAX_BRANCH=dev_tax_service`.
 - Console log Jenkins dong deploy image dung commit id.
+- GitOps repo co commit `jenkins-bot` update image tag neu CD job bat `PUSH_GITOPS=true`.
 - `kubectl get pods -n yas`.
 - `kubectl get svc -n ingress-nginx ingress-nginx-controller` hien `NodePort`.
 - Link `storefront/backoffice/swagger-ui` mo duoc bang `domain:nodeport`.
