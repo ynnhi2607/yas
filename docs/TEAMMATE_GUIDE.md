@@ -112,6 +112,14 @@ Ví dụ test branch `fix-tax-demo` cho service `tax`:
 TAX_BRANCH=fix-tax-demo
 ```
 
+Trước khi bật GitOps push cho branch khác `main`, phải chạy CI/build image cho branch đó trước. Ví dụ với `TAX_BRANCH=fix-tax-demo`, DockerHub cần có image:
+
+```text
+ynnhi2607/yas-tax:<short-commit-id>
+```
+
+Nếu image chưa tồn tại, Jenkins sẽ không update GitOps để tránh ArgoCD deploy pod `ErrImagePull`.
+
 Kết quả mong đợi:
 
 - Jenkins deploy service `tax` bằng image tag theo commit id của branch.

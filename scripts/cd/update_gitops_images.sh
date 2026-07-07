@@ -15,6 +15,7 @@ GITOPS_TOKEN="${GITOPS_TOKEN:-}"
 GITOPS_COMMIT_USER="${GITOPS_COMMIT_USER:-jenkins-bot}"
 GITOPS_COMMIT_EMAIL="${GITOPS_COMMIT_EMAIL:-jenkins@local}"
 BUILD_LABEL="${BUILD_NUMBER:-local}"
+VERIFY_GITOPS_IMAGES="${VERIFY_GITOPS_IMAGES:-true}"
 
 SERVICES=(
   product
@@ -145,6 +146,42 @@ update_values_file() {
   sed -i "s#^\\([[:space:]]*tag:\\).*#\\1 ${image_tag}#" "$values_file"
 }
 
+should_verify_image() {
+  local service="$1"
+  local branch="$2"
+  local commit_var
+  commit_var="$(env_name "$service")_COMMIT"
+
+  if [[ -n "${!commit_var:-}" ]]; then
+    return 0
+  fi
+
+  [[ "$branch" != "main" && "$branch" != "master" && -n "$branch" ]]
+}
+
+verify_image_exists() {
+  local image="$1"
+
+  if [[ "$VERIFY_GITOPS_IMAGES" != "true" ]]; then
+    return
+  fi
+
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "docker CLI is required to verify image existence: ${image}" >&2
+    exit 1
+  fi
+
+  if ! docker manifest inspect "$image" >/dev/null 2>&1; then
+    cat >&2 <<EOF
+Image does not exist yet: ${image}
+
+Run the CI image build first, then rerun developer_build.
+The GitOps repo is not updated because ArgoCD would deploy an image that Kubernetes cannot pull.
+EOF
+    exit 1
+  fi
+}
+
 cd "$ROOT_DIR"
 
 AUTHED_GITOPS_REPO_URL="$(gitops_auth_url)"
@@ -175,6 +212,9 @@ for service in "${SERVICES[@]}"; do
   repo="$(image_repo_for_branch "$service" "$branch")"
 
   echo "GitOps ${ENVIRONMENT}/${service}: branch=${branch}, image=${repo}:${tag}"
+  if should_verify_image "$service" "$branch"; then
+    verify_image_exists "${repo}:${tag}"
+  fi
   update_values_file "$values_file" "$repo" "$tag"
   git -C "$GITOPS_REPO_DIR" add "$values_file_relative"
 done
