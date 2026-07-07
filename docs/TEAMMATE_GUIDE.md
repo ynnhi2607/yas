@@ -158,6 +158,23 @@ Jenkins container: jenkins-yas
 Jenkins CD job developer_build: đã test success
 ```
 
+## 5.1. Kiểm tra service mesh
+
+Phần service mesh dùng Istio và có runbook riêng:
+
+```text
+docs/SERVICE_MESH_RUNBOOK.md
+```
+
+Lệnh kiểm tra nhanh trên VM:
+
+```bash
+cd ~/yas/k8s/deploy
+./service-mesh/verify-mesh.sh
+```
+
+Khi mesh đã bật đúng, pod trong `yas-dev` và `yas-staging` sẽ có thêm container `istio-proxy`.
+
 ## 6. Mở Jenkins cho cả nhóm
 
 Jenkins chạy trên GCP VM nên VM phải đang bật thì cả nhóm mới mở được.
