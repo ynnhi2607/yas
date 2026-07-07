@@ -153,9 +153,7 @@ if [[ ! -d "$GITOPS_REPO_DIR/.git" ]]; then
   git clone "$AUTHED_GITOPS_REPO_URL" "$GITOPS_REPO_DIR"
 fi
 
-if [[ -n "$GITOPS_TOKEN" && "$GITOPS_REPO_URL" == https://* ]]; then
-  git -C "$GITOPS_REPO_DIR" remote set-url origin "$AUTHED_GITOPS_REPO_URL"
-fi
+git -C "$GITOPS_REPO_DIR" remote set-url origin "$AUTHED_GITOPS_REPO_URL"
 
 if [[ "$GITOPS_PULL" == "true" ]]; then
   git -C "$GITOPS_REPO_DIR" fetch origin main
