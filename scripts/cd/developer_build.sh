@@ -186,26 +186,16 @@ deploy_ui_service() {
 }
 
 print_urls() {
-  local node_port=""
-  node_port="$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}' 2>/dev/null || true)"
-
   echo
   echo "Deployment finished."
   echo
-  if [[ -n "$node_port" ]]; then
-    echo "NodePort URLs:"
-    echo "  http://storefront.yas.local.com:${node_port}"
-    echo "  http://backoffice.yas.local.com:${node_port}"
-    echo "  http://api.yas.local.com:${node_port}/swagger-ui/"
-  else
-    echo "Ingress URLs:"
-    echo "  http://storefront.yas.local.com"
-    echo "  http://backoffice.yas.local.com"
-    echo "  http://api.yas.local.com/swagger-ui/"
-    echo
-    echo "If running locally through port-forward:"
-    echo "  kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 18080:80 --address 0.0.0.0"
-  fi
+  echo "Ingress URLs:"
+  echo "  http://storefront.yas.local.com"
+  echo "  http://backoffice.yas.local.com"
+  echo "  http://api.yas.local.com/swagger-ui/"
+  echo
+  echo "If the VM IP changed, update your hosts file or run:"
+  echo "  HOST_IP=<vm-ip> ./scripts/cd/print_demo_urls.sh"
 }
 
 cd "$ROOT_DIR"

@@ -232,12 +232,12 @@ kubectl scale deployment sampledata -n yas --replicas=0
 
 ## 7. Link sau khi deploy
 
-Neu ingress-nginx expose bang NodePort, Jenkins se in:
+Tren VM GCP hien tai, ingress-nginx duoc expose qua port 80 cua k3d load balancer, nen URL khong can port:
 
 ```text
-http://storefront.yas.local.com:<nodeport>
-http://backoffice.yas.local.com:<nodeport>
-http://api.yas.local.com:<nodeport>/swagger-ui/
+http://storefront.yas.local.com
+http://backoffice.yas.local.com
+http://api.yas.local.com/swagger-ui/
 ```
 
 Co the in lai link bat ky luc nao bang:
@@ -246,27 +246,31 @@ Co the in lai link bat ky luc nao bang:
 ./scripts/cd/print_demo_urls.sh
 ```
 
-Tren cluster hien tai, `ingress-nginx-controller` dang la `NodePort`. Lay port bang:
+Neu VM IP thay doi, truyen IP moi vao script:
 
 ```bash
-kubectl get svc -n ingress-nginx ingress-nginx-controller
+HOST_IP=<vm-ip> ./scripts/cd/print_demo_urls.sh
 ```
 
-Neu chay local bang port-forward:
+Dev va staging cung dung URL khong port:
+
+```text
+http://storefront-dev.yas.local.com
+http://backoffice-dev.yas.local.com
+http://api-dev.yas.local.com/swagger-ui/
+
+http://storefront-staging.yas.local.com
+http://backoffice-staging.yas.local.com
+http://api-staging.yas.local.com/swagger-ui/
+```
+
+Neu can debug bang port-forward local:
 
 ```bash
 kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 18080:80 --address 0.0.0.0
 ```
 
-Mo:
-
-```text
-http://storefront.yas.local.com
-http://backoffice.yas.local.com
-http://api.yas.local.com/swagger-ui/
-```
-
-Neu chua co Windows `netsh portproxy`, mo tam bang:
+Khi do co the mo tam bang:
 
 ```text
 http://storefront.yas.local.com:18080
@@ -314,8 +318,7 @@ Nen chup cac man hinh:
 - Console log Jenkins dong deploy image dung commit id.
 - GitOps repo co commit `jenkins-bot` update image tag neu CD job bat `PUSH_GITOPS=true`.
 - `kubectl get pods -n yas`.
-- `kubectl get svc -n ingress-nginx ingress-nginx-controller` hien `NodePort`.
-- Link `storefront/backoffice/swagger-ui` mo duoc bang `domain:nodeport`.
+- Link `storefront/backoffice/swagger-ui` mo duoc bang domain khong port.
 - Jenkins job `delete_developer_env` chay thanh cong.
 
 ## 10. Ghi chu hien tai cua demo
