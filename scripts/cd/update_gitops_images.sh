@@ -65,8 +65,8 @@ image_repo_for() {
 default_image_repo_for() {
   local service="$1"
   case "$service" in
-    storefront-ui) echo "ghcr.io/nashtech-garage/yas-storefront" ;;
-    backoffice-ui) echo "ghcr.io/nashtech-garage/yas-backoffice" ;;
+    storefront-ui) echo "${DOCKERHUB_USERNAME}/yas-storefront" ;;
+    backoffice-ui) echo "${DOCKERHUB_USERNAME}/yas-backoffice" ;;
     *) echo "ghcr.io/nashtech-garage/yas-${service}" ;;
   esac
 }
