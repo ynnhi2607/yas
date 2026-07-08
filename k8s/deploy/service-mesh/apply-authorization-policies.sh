@@ -12,28 +12,26 @@ principal() {
 for namespace in $MESH_NAMESPACES; do
   kubectl get namespace "$namespace" >/dev/null
 
-  cat <<YAML | kubectl apply -f -
+  for public_service in storefront-ui backoffice-ui storefront-bff backoffice-bff swagger-ui yas-dev-swagger-ui yas-staging-swagger-ui; do
+    cat <<YAML | kubectl apply -f -
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
-  name: allow-public-entrypoints
+  name: allow-public-${public_service}
   namespace: ${namespace}
   labels:
     app.kubernetes.io/part-of: yas-service-mesh
 spec:
   action: ALLOW
   selector:
-    matchExpressions:
-      - key: app.kubernetes.io/name
-        operator: In
-        values:
-          - storefront-ui
-          - backoffice-ui
-          - storefront-bff
-          - backoffice-bff
-          - swagger-ui
+    matchLabels:
+      app.kubernetes.io/name: ${public_service}
   rules:
     - {}
+YAML
+  done
+
+  cat <<YAML | kubectl apply -f -
 ---
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
