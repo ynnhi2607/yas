@@ -78,7 +78,7 @@ destinationrule.networking.istio.io/default-istio-mutual
 
 ## 4. Bật Gateway/VirtualService kiểu Thu
 
-Để có thêm bằng chứng giống repo tham khảo của Thu, bật Istio Gateway và VirtualService song song với Nginx ingress hiện tại. Cách này không thay public ingress đang chạy, nhưng cho phép test traffic qua `istio-ingressgateway`.
+Để có thêm bằng chứng giống repo tham khảo của Thu, bật Istio Gateway và VirtualService. Khi chỉ test nhanh, có thể port-forward `istio-ingressgateway`. Khi bật STRICT mTLS hoặc muốn mở web qua port 80 như demo chính, phải chuyển public entrypoint từ Nginx ingress sang Istio ingressgateway để tránh tình trạng request lúc đi Nginx, lúc đi Istio.
 
 ```bash
 cd ~/yas/k8s/deploy
@@ -99,6 +99,28 @@ Kiểm tra tài nguyên:
 ```bash
 kubectl get gateway,virtualservice -n yas-dev
 kubectl get gateway,virtualservice -n yas-staging
+```
+
+Chuyển public port 80/443 sang Istio giống hướng của Thu:
+
+```bash
+cd ~/yas/k8s/deploy
+./service-mesh/switch-public-gateway.sh
+```
+
+Script sẽ:
+
+- Patch `ingress-nginx-controller` về `ClusterIP`.
+- Patch `istio-ingressgateway` thành `LoadBalancer`.
+- Xóa các pod `svclb-*` cũ của k3s để port 80/443 chỉ bind qua Istio.
+- Test nhiều lần để đảm bảo response luôn có `server: istio-envoy` hoặc `x-envoy-upstream-service-time`.
+
+Nếu response lúc `200` lúc `404 text/plain`, nghĩa là port 80 vẫn đang bị chia giữa Nginx và Istio. Chạy lại script trên và kiểm tra:
+
+```bash
+kubectl get svc -n ingress-nginx ingress-nginx-controller
+kubectl get svc -n istio-system istio-ingressgateway
+kubectl get pods -n kube-system | grep svclb
 ```
 
 ## 5. Test lại sau khi bật mesh
