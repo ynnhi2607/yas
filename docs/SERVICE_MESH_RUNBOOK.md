@@ -111,16 +111,22 @@ cd ~/yas/k8s/deploy
 Script sẽ:
 
 - Patch `ingress-nginx-controller` về `ClusterIP`.
+- Patch `traefik` về `ClusterIP` nếu cluster còn service LoadBalancer mặc định của k3s.
 - Patch `istio-ingressgateway` thành `LoadBalancer`.
 - Xóa các pod `svclb-*` cũ của k3s để port 80/443 chỉ bind qua Istio.
-- Test nhiều lần để đảm bảo response luôn có `server: istio-envoy` hoặc `x-envoy-upstream-service-time`.
+- Restart `k3d-yas-cluster-serverlb` nếu đang chạy trên k3d.
+- Test nhiều lần qua public port 80 để đảm bảo response luôn có `server: istio-envoy` hoặc `x-envoy-upstream-service-time`.
 
-Nếu response lúc `200` lúc `404 text/plain`, nghĩa là port 80 vẫn đang bị chia giữa Nginx và Istio. Chạy lại script trên và kiểm tra:
+Chờ traffic public ổn định rồi mới xác nhận response từ các route ổn định như `/`, `/swagger-ui/`, và static asset `/_next/static/...`.
+
+Nếu response lúc `200` lúc `404 text/plain`, nghĩa là public port 80 vẫn đang bị chia giữa Istio và một entrypoint cũ như Nginx/Traefik. Chạy lại script trên và kiểm tra:
 
 ```bash
 kubectl get svc -n ingress-nginx ingress-nginx-controller
+kubectl get svc -n kube-system traefik
 kubectl get svc -n istio-system istio-ingressgateway
 kubectl get pods -n kube-system | grep svclb
+docker ps | grep k3d-yas-cluster-serverlb
 ```
 
 ## 5. Test lại sau khi bật mesh
