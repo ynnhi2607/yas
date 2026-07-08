@@ -339,6 +339,13 @@ storefrontBffExtraConfig:
                 filters:
                   - RewritePath=/api/(?<segment>.*), /$\{segment}
                   - TokenRelay=
+              - id: search_api
+                uri: http://search
+                predicates:
+                  - Path=/api/search/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
               - id: sampledata_api
                 uri: http://sampledata
                 predicates:
