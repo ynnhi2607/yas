@@ -13,10 +13,12 @@ Giữ nguyên:
 - ArgoCD sync app như cũ.
 - Jenkins build/deploy như cũ.
 
-Không bật STRICT mTLS toàn namespace ngay từ đầu vì hệ thống còn nhận traffic từ Nginx ingress không nằm trong mesh và dùng nhiều service nền ngoài mesh như PostgreSQL, Redis, Kafka, Keycloak. Để demo ổn định, repo dùng:
+Hướng hiện tại giống repo tham khảo của Thu: public traffic đi qua Istio ingressgateway, workload trong namespace ứng dụng có sidecar, và policy được quản lý bằng GitOps. Repo dùng:
 
-- `PeerAuthentication` mode `PERMISSIVE`: workload mesh vẫn nhận được traffic plain từ ingress/service nền.
+- `PeerAuthentication` mode `STRICT`: service-to-service trong namespace app bắt buộc dùng mTLS.
 - `DestinationRule` mode `ISTIO_MUTUAL` cho `*.namespace.svc.cluster.local`: traffic service-to-service trong namespace có sidecar sẽ dùng Istio mutual TLS.
+- `DestinationRule` mode `DISABLE` cho các service nền ngoài mesh như PostgreSQL, Redis, Kafka, Keycloak, Elasticsearch.
+- `AuthorizationPolicy` allow-list: public workload chỉ nhận traffic từ `istio-ingressgateway`, internal workload chỉ nhận từ service account được phép.
 
 ## 2. Cài Istio
 
@@ -265,7 +267,81 @@ http://34.87.83.182:20001
 
 Lưu ý: nếu mở public port `20001`, nên chỉ allow IP của nhóm trong firewall giống Jenkins, không mở `0.0.0.0/0`.
 
-## 9. Hình nên chụp cho báo cáo
+## 9. Observability: Grafana, Prometheus, Loki, Tempo
+
+Phần observability dùng:
+
+- Prometheus: metrics.
+- Grafana: dashboard.
+- Loki: log storage.
+- Promtail: collect pod logs.
+- Tempo: distributed tracing.
+- OpenTelemetry Collector: nhận logs/traces và forward sang Loki/Tempo.
+
+Cài stack nền tảng từ repo `yas`:
+
+```bash
+cd ~/yas/k8s/deploy
+chmod +x ./setup-observability.sh
+./setup-observability.sh
+```
+
+Sau đó apply GitOps addons giống hướng Thu:
+
+```bash
+cd ~/yas-gitops
+git pull origin main
+./scripts/apply-apps.sh observability
+```
+
+Kiểm tra:
+
+```bash
+kubectl get applications -n argocd | grep observability
+kubectl get pods -n observability
+kubectl get svc -n observability | grep -E 'prometheus|grafana|loki|tempo|opentelemetry'
+```
+
+Mở Grafana:
+
+```bash
+kubectl port-forward -n observability svc/prometheus-grafana 3000:80 --address 0.0.0.0
+```
+
+Trên browser:
+
+```text
+http://<VM_EXTERNAL_IP>:3000
+```
+
+Tài khoản mặc định nếu không override:
+
+```text
+admin / admin
+```
+
+Trong Grafana nên có datasource:
+
+- `Prometheus`
+- `Loki`
+- `Tempo`
+
+Tạo traffic để có dữ liệu:
+
+```bash
+curl -I -H "Host: storefront-dev.yas.local.com" http://127.0.0.1/
+curl -I -H "Host: api-dev.yas.local.com" http://127.0.0.1/swagger-ui/
+```
+
+Evidence nên chụp:
+
+- Grafana datasource list có Prometheus/Loki/Tempo.
+- Explore Loki query `{namespace="yas-dev"}` hoặc `{namespace="yas-staging"}`.
+- Prometheus targets/service monitors.
+- Tempo trace/service graph nếu có traffic.
+- Kiali graph cho service mesh.
+
+## 10. Hình nên chụp cho báo cáo
 
 - `kubectl get pods -n istio-system`.
 - `kubectl get ns yas-dev yas-staging --show-labels`.
@@ -279,8 +355,10 @@ Lưu ý: nếu mở public port `20001`, nên chỉ allow IP của nhóm trong f
 - Output `./service-mesh/test-traffic.sh` có header `x-envoy...`.
 - ArgoCD UI dạng cây cho app dev/staging.
 - Browser mở được storefront/backoffice/swagger sau khi bật mesh.
+- `kubectl get pods -n observability`.
+- Grafana Explore/Dashboards có Prometheus, Loki, Tempo.
 
-## 10. Tắt mesh nếu cần rollback
+## 11. Tắt mesh nếu cần rollback
 
 Nếu mesh làm cluster nặng hoặc cần quay lại trạng thái cũ:
 
@@ -298,7 +376,7 @@ cd ~/yas/k8s/deploy
 ./service-mesh/uninstall-istio.sh
 ```
 
-## 11. Lưu ý tài nguyên
+## 12. Lưu ý tài nguyên
 
 Istio thêm sidecar `istio-proxy` vào mỗi pod nên cluster sẽ tốn RAM/CPU hơn. Nếu VM đang yếu, chỉ mesh một namespace để demo:
 
