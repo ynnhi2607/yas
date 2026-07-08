@@ -12,6 +12,7 @@ for namespace in $MESH_NAMESPACES; do
   echo "== Namespace: ${namespace} =="
   kubectl get namespace "$namespace" --show-labels
   kubectl get peerauthentication -n "$namespace" || true
+  kubectl get destinationrule -n "$namespace" || true
   kubectl get pods -n "$namespace"
 
   echo

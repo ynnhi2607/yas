@@ -7,18 +7,11 @@ MESH_NAMESPACES="${MESH_NAMESPACES:-yas-dev yas-staging}"
 for namespace in $MESH_NAMESPACES; do
   kubectl get namespace "$namespace" >/dev/null
   kubectl label namespace "$namespace" istio-injection=enabled --overwrite
+done
 
-  cat <<YAML | kubectl apply -f -
-apiVersion: security.istio.io/v1
-kind: PeerAuthentication
-metadata:
-  name: default
-  namespace: ${namespace}
-spec:
-  mtls:
-    mode: PERMISSIVE
-YAML
+"$SCRIPT_DIR/apply-policies.sh"
 
+for namespace in $MESH_NAMESPACES; do
   kubectl rollout restart deployment -n "$namespace"
 done
 
