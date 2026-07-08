@@ -295,6 +295,7 @@ pipeline {
     string(name: 'GITOPS_COMMIT_USER', defaultValue: 'jenkins-bot', description: 'Git author name for GitOps commits')
     string(name: 'GITOPS_COMMIT_EMAIL', defaultValue: 'jenkins@local', description: 'Git author email for GitOps commits')
     booleanParam(name: 'PUSH_GITOPS', defaultValue: true, description: 'Push GitOps changes to origin/main')
+    booleanParam(name: 'ENABLE_TESTS', defaultValue: true, description: 'Run unit and integration tests for selected services')
     string(name: 'COVERAGE_THRESHOLD', defaultValue: '70.0', description: 'Minimum coverage percentage required by Jenkins Coverage plugin')
     booleanParam(name: 'ENABLE_COVERAGE_PUBLISH', defaultValue: false, description: 'Publish JaCoCo coverage with Jenkins Coverage plugin')
     booleanParam(name: 'ENABLE_GITLEAKS', defaultValue: true, description: 'Run Gitleaks secret scanning')
@@ -381,6 +382,7 @@ pipeline {
     stage('Test selected services') {
       when {
         allOf {
+          expression { params.ENABLE_TESTS }
           expression { env.SELECTED_SERVICES?.trim() }
           expression { !((env.TAG_NAME ?: '') ==~ /^v.*/) }
         }
