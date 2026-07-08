@@ -114,15 +114,19 @@ def prepareJava21Build = {
 
 def publishBackendTestReports = { Map service ->
   junit testResults: "${service.context}/target/surefire-reports/*.xml,${service.context}/target/failsafe-reports/*.xml", allowEmptyResults: true
-  recordCoverage(
-    id: "coverage-${service.name}",
-    name: "Coverage: ${service.name}",
-    tools: [[parser: 'JACOCO', pattern: "${service.context}/target/site/jacoco/jacoco.xml"]],
-    enabledForFailure: true,
-    qualityGates: [
-      [threshold: params.COVERAGE_THRESHOLD as Double, metric: 'LINE', baseline: 'PROJECT', criticality: 'FAILURE']
-    ]
-  )
+  if (params.ENABLE_COVERAGE_PUBLISH) {
+    recordCoverage(
+      id: "coverage-${service.name}",
+      name: "Coverage: ${service.name}",
+      tools: [[parser: 'JACOCO', pattern: "${service.context}/target/site/jacoco/jacoco.xml"]],
+      enabledForFailure: true,
+      qualityGates: [
+        [threshold: params.COVERAGE_THRESHOLD as Double, metric: 'LINE', baseline: 'PROJECT', criticality: 'FAILURE']
+      ]
+    )
+  } else {
+    echo "Coverage publishing is disabled. Set ENABLE_COVERAGE_PUBLISH=true after installing Jenkins Coverage plugin."
+  }
 }
 
 def testBackendService = { Map service ->
@@ -149,6 +153,25 @@ def testService = { Map service ->
     testBackendService(service)
   } else {
     testUiService(service)
+  }
+}
+
+def packageSelectedServices = { List selectedServiceNames ->
+  def backendContexts = selectedServiceNames.collect { serviceConfig(it.trim()) }
+    .findAll { service -> backendServices.find { it.name == service.name } }
+    .collect { it.context }
+
+  if (backendContexts) {
+    prepareJava21Build()
+    sh "mvn -B -ntp -DskipTests clean package -pl ${backendContexts.join(',')} -am"
+  }
+
+  def uiContexts = selectedServiceNames.collect { serviceConfig(it.trim()) }
+    .findAll { service -> uiServices.find { it.name == service.name } }
+    .collect { it.context }
+
+  if (uiContexts) {
+    echo "UI Dockerfiles run npm build inside docker build: ${uiContexts.join(',')}"
   }
 }
 
@@ -291,7 +314,10 @@ pipeline {
     string(name: 'GITOPS_COMMIT_USER', defaultValue: 'jenkins-bot', description: 'Git author name for GitOps commits')
     string(name: 'GITOPS_COMMIT_EMAIL', defaultValue: 'jenkins@local', description: 'Git author email for GitOps commits')
     booleanParam(name: 'PUSH_GITOPS', defaultValue: true, description: 'Push GitOps changes to origin/main')
+    booleanParam(name: 'ENABLE_TESTS', defaultValue: true, description: 'Run unit and integration tests for selected services')
+    booleanParam(name: 'ENABLE_IMAGE_BUILD', defaultValue: true, description: 'Build and push Docker images for selected services')
     string(name: 'COVERAGE_THRESHOLD', defaultValue: '70.0', description: 'Minimum coverage percentage required by Jenkins Coverage plugin')
+    booleanParam(name: 'ENABLE_COVERAGE_PUBLISH', defaultValue: false, description: 'Publish JaCoCo coverage with Jenkins Coverage plugin')
     booleanParam(name: 'ENABLE_GITLEAKS', defaultValue: true, description: 'Run Gitleaks secret scanning')
     booleanParam(name: 'ENABLE_SONAR', defaultValue: true, description: 'Run SonarQube/SonarCloud quality scan')
     string(name: 'SONARQUBE_ENV', defaultValue: 'SonarQube-Local', description: 'Jenkins SonarQube server config name')
@@ -364,7 +390,10 @@ pipeline {
 
     stage('Docker login') {
       when {
-        expression { env.SELECTED_SERVICES?.trim() }
+        allOf {
+          expression { params.ENABLE_IMAGE_BUILD }
+          expression { env.SELECTED_SERVICES?.trim() }
+        }
       }
       steps {
         withCredentials([usernamePassword(credentialsId: params.DOCKERHUB_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
@@ -376,6 +405,7 @@ pipeline {
     stage('Test selected services') {
       when {
         allOf {
+          expression { params.ENABLE_TESTS }
           expression { env.SELECTED_SERVICES?.trim() }
           expression { !((env.TAG_NAME ?: '') ==~ /^v.*/) }
         }
@@ -440,12 +470,17 @@ pipeline {
     stage('Build and push images') {
       when {
         allOf {
+          expression { params.ENABLE_IMAGE_BUILD }
           expression { env.SELECTED_SERVICES?.trim() }
           expression { !((env.TAG_NAME ?: '') ==~ /^v.*/) }
         }
       }
       steps {
         script {
+          if (!params.ENABLE_TESTS) {
+            packageSelectedServices(env.SELECTED_SERVICES.split(',').findAll { it?.trim() })
+          }
+
           env.SELECTED_SERVICES.split(',').findAll { it?.trim() }.each { serviceName ->
             def service = serviceConfig(serviceName.trim())
             buildAndPushImage(service, env.COMMIT_TAG, env.CURRENT_BRANCH)
@@ -457,6 +492,7 @@ pipeline {
     stage('CD Dev GitOps update') {
       when {
         allOf {
+          expression { params.ENABLE_IMAGE_BUILD }
           expression { env.SELECTED_SERVICES?.trim() }
           expression { env.CURRENT_BRANCH == 'main' || env.CURRENT_BRANCH == 'master' }
         }
@@ -473,7 +509,10 @@ pipeline {
 
     stage('CD Staging GitOps update') {
       when {
-        expression { (env.TAG_NAME ?: '') ==~ /^v.*/ }
+        allOf {
+          expression { params.ENABLE_IMAGE_BUILD }
+          expression { (env.TAG_NAME ?: '') ==~ /^v.*/ }
+        }
       }
       steps {
         script {

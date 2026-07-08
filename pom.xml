@@ -76,6 +76,7 @@
         <opencsv.version>5.9</opencsv.version>
         <spring-retry.version>2.0.13</spring-retry.version>
         <jacoco-maven-plugin.version>0.8.14</jacoco-maven-plugin.version>
+        <parsson.version>1.1.8</parsson.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -122,6 +123,11 @@
                 <groupId>org.postgresql</groupId>
                 <artifactId>postgresql</artifactId>
                 <version>${postgresql.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.parsson</groupId>
+                <artifactId>parsson</artifactId>
+                <version>${parsson.version}</version>
             </dependency>
             <dependency>
                 <groupId>commons-beanutils</groupId>
