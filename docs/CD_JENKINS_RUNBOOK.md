@@ -30,7 +30,7 @@ Core services:
 - swagger-ui
 - sampledata
 
-`sampledata` chi chay khi can seed data, sau do co the scale ve 0.
+`sampledata` duoc GitOps quan ly trong dev/staging va co PostSync Job tu seed demo data.
 
 ## 2. CI image tag
 
@@ -145,7 +145,7 @@ Parameters chinh trong Jenkinsfile:
 
 - `NAMESPACE`: namespace deploy, mac dinh `yas`
 - `DOCKERHUB_USERNAME`: Docker Hub username/org
-- `DEPLOY_SAMPLEDATA`: bat khi can seed data
+- `DEPLOY_SAMPLEDATA`: chi dung cho developer environment tam thoi; dev/staging dung GitOps auto-seed
 - `<SERVICE>_BRANCH`: branch hoac commit cua tung service, vi du `TAX_BRANCH=dev_tax_service`
 - `UPDATE_GITOPS`: tao commit update image tag trong repo GitOps
 - `PUSH_GITOPS`: push commit GitOps len `origin/main`
@@ -226,17 +226,8 @@ Neu can doi Docker Hub username:
 DOCKERHUB_USERNAME=mydockerhub TAX_BRANCH=dev_tax_service ./scripts/cd/developer_build.sh
 ```
 
-Neu can seed data:
-
-```bash
-DEPLOY_SAMPLEDATA=true ./scripts/cd/developer_build.sh
-```
-
-Sau khi sampledata chay xong, tat lai:
-
-```bash
-kubectl scale deployment sampledata -n yas --replicas=0
-```
+Dev/staging se tu seed data sau khi ArgoCD sync app `sampledata`.
+Voi developer environment tam thoi, co the bat `DEPLOY_SAMPLEDATA=true` neu can test seed rieng.
 
 ## 7. Link sau khi deploy
 
