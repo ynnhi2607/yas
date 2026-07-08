@@ -76,7 +76,32 @@ peerauthentication.security.istio.io/default
 destinationrule.networking.istio.io/default-istio-mutual
 ```
 
-## 4. Test lại sau khi bật mesh
+## 4. Bật Gateway/VirtualService kiểu Thu
+
+Để có thêm bằng chứng giống repo tham khảo của Thu, bật Istio Gateway và VirtualService song song với Nginx ingress hiện tại. Cách này không thay public ingress đang chạy, nhưng cho phép test traffic qua `istio-ingressgateway`.
+
+```bash
+cd ~/yas/k8s/deploy
+./service-mesh/install-istio.sh
+MESH_NAMESPACES="yas-dev yas-staging" ./service-mesh/apply-gateway-routes.sh
+./service-mesh/test-istio-gateway.sh
+```
+
+Script tạo:
+
+- `Gateway` `yas-gateway`.
+- `VirtualService` route storefront/backoffice/api theo host dev và staging.
+- Retry policy cho `tax` và `product`.
+- Header policy cho Elasticsearch để tránh lỗi client/search khi đi qua mesh.
+
+Kiểm tra tài nguyên:
+
+```bash
+kubectl get gateway,virtualservice -n yas-dev
+kubectl get gateway,virtualservice -n yas-staging
+```
+
+## 5. Test lại sau khi bật mesh
 
 Kiểm tra ArgoCD:
 
@@ -115,18 +140,119 @@ x-envoy-upstream-service-time
 x-envoy-decorator-operation
 ```
 
-## 5. Hình nên chụp cho báo cáo
+## 6. Bật policy nâng cao kiểu allow-list
+
+Mặc định `enable-mesh.sh` chỉ bật sidecar + mTLS nội bộ để demo ổn định. Nếu cần phần security giống hướng của Thu hơn, bật thêm `AuthorizationPolicy`:
+
+```bash
+cd ~/yas/k8s/deploy
+MESH_NAMESPACES="yas-dev" ./service-mesh/apply-authorization-policies.sh
+./service-mesh/test-traffic.sh
+kubectl get authorizationpolicy -n yas-dev
+kubectl get pods -n yas-dev
+```
+
+Khi dev ổn rồi mới bật staging:
+
+```bash
+MESH_NAMESPACES="yas-staging" ./service-mesh/apply-authorization-policies.sh
+./service-mesh/test-traffic.sh
+kubectl get authorizationpolicy -n yas-staging
+```
+
+Các policy này làm theo hướng allow-list:
+
+- Public entrypoints vẫn mở: `storefront-ui`, `backoffice-ui`, `storefront-bff`, `backoffice-bff`, `swagger-ui`.
+- Internal service chỉ nhận request từ service account được phép.
+- Health endpoint vẫn được allow để Kubernetes/ArgoCD kiểm tra.
+- `deny-all-by-default` chặn những request không match allow-list.
+
+Nếu sau khi bật allow-list mà app lỗi, rollback riêng policy:
+
+```bash
+kubectl delete authorizationpolicy -n yas-dev -l app.kubernetes.io/part-of=yas-service-mesh
+kubectl delete authorizationpolicy -n yas-staging -l app.kubernetes.io/part-of=yas-service-mesh
+```
+
+Sau đó test lại URL.
+
+## 7. Bật STRICT mTLS nếu cần giống Thu hơn nữa
+
+Repo tham khảo của Thu dùng `STRICT` mTLS. Với cluster hiện tại, chỉ bật STRICT sau khi Gateway/VirtualService và AuthorizationPolicy đã chạy ổn, vì Nginx ingress không nằm trong mesh có thể không gọi thẳng vào workload được nữa.
+
+Test qua Istio Gateway trước:
+
+```bash
+./service-mesh/test-istio-gateway.sh
+```
+
+Bật STRICT cho dev trước:
+
+```bash
+CONFIRM_STRICT=true MESH_NAMESPACES="yas-dev" ./service-mesh/apply-strict-mtls.sh
+./service-mesh/test-istio-gateway.sh
+kubectl get peerauthentication,destinationrule -n yas-dev
+```
+
+Nếu dev ổn mới bật staging:
+
+```bash
+CONFIRM_STRICT=true MESH_NAMESPACES="yas-staging" ./service-mesh/apply-strict-mtls.sh
+./service-mesh/test-istio-gateway.sh
+kubectl get peerauthentication,destinationrule -n yas-staging
+```
+
+Rollback về PERMISSIVE:
+
+```bash
+MTLS_MODE=PERMISSIVE MESH_NAMESPACES="yas-dev yas-staging" ./service-mesh/apply-policies.sh
+```
+
+## 8. Mở Kiali GUI
+
+Istio không có UI mặc định. Để xem service graph/cây traffic, dùng Kiali:
+
+```bash
+cd ~/yas/k8s/deploy
+./service-mesh/install-kiali.sh
+```
+
+Mở Kiali từ VM:
+
+```bash
+kubectl port-forward -n istio-system svc/kiali 20001:20001 --address 0.0.0.0
+```
+
+Sau đó mở trên browser:
+
+```text
+http://<VM_EXTERNAL_IP>:20001
+```
+
+Ví dụ nếu VM đang là `34.87.83.182`:
+
+```text
+http://34.87.83.182:20001
+```
+
+Lưu ý: nếu mở public port `20001`, nên chỉ allow IP của nhóm trong firewall giống Jenkins, không mở `0.0.0.0/0`.
+
+## 9. Hình nên chụp cho báo cáo
 
 - `kubectl get pods -n istio-system`.
 - `kubectl get ns yas-dev yas-staging --show-labels`.
 - Output `./service-mesh/verify-mesh.sh` có container `istio-proxy`.
 - `kubectl get peerauthentication,destinationrule -n yas-dev`.
 - `kubectl get peerauthentication,destinationrule -n yas-staging`.
+- `kubectl get gateway,virtualservice -n yas-dev`.
+- Output `./service-mesh/test-istio-gateway.sh`.
+- `kubectl get authorizationpolicy -n yas-dev` nếu đã bật allow-list.
+- Kiali Graph view có các service gọi nhau.
 - Output `./service-mesh/test-traffic.sh` có header `x-envoy...`.
 - ArgoCD UI dạng cây cho app dev/staging.
 - Browser mở được storefront/backoffice/swagger sau khi bật mesh.
 
-## 6. Tắt mesh nếu cần rollback
+## 10. Tắt mesh nếu cần rollback
 
 Nếu mesh làm cluster nặng hoặc cần quay lại trạng thái cũ:
 
@@ -144,7 +270,7 @@ cd ~/yas/k8s/deploy
 ./service-mesh/uninstall-istio.sh
 ```
 
-## 7. Lưu ý tài nguyên
+## 11. Lưu ý tài nguyên
 
 Istio thêm sidecar `istio-proxy` vào mỗi pod nên cluster sẽ tốn RAM/CPU hơn. Nếu VM đang yếu, chỉ mesh một namespace để demo:
 
