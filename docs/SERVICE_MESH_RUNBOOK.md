@@ -13,7 +13,10 @@ Giữ nguyên:
 - ArgoCD sync app như cũ.
 - Jenkins build/deploy như cũ.
 
-Không bật STRICT mTLS ngay từ đầu vì hệ thống còn dùng nhiều service nền ngoài mesh như PostgreSQL, Redis, Kafka, Keycloak. Để demo ổn định, repo dùng `PeerAuthentication` mode `PERMISSIVE`.
+Không bật STRICT mTLS toàn namespace ngay từ đầu vì hệ thống còn nhận traffic từ Nginx ingress không nằm trong mesh và dùng nhiều service nền ngoài mesh như PostgreSQL, Redis, Kafka, Keycloak. Để demo ổn định, repo dùng:
+
+- `PeerAuthentication` mode `PERMISSIVE`: workload mesh vẫn nhận được traffic plain từ ingress/service nền.
+- `DestinationRule` mode `ISTIO_MUTUAL` cho `*.namespace.svc.cluster.local`: traffic service-to-service trong namespace có sidecar sẽ dùng Istio mutual TLS.
 
 ## 2. Cài Istio
 
@@ -44,6 +47,7 @@ Script sẽ:
 
 - Gắn label `istio-injection=enabled` cho namespace.
 - Tạo `PeerAuthentication` mode `PERMISSIVE`.
+- Tạo `DestinationRule` mode `ISTIO_MUTUAL` cho service-to-service traffic trong namespace.
 - Restart deployment để pod mới có thêm container `istio-proxy`.
 
 Kiểm tra nhanh:
@@ -56,6 +60,20 @@ Trong phần `Containers`, mỗi pod app nên có dạng:
 
 ```text
 service-name-xxxxx    service-name istio-proxy
+```
+
+Kiểm tra policy:
+
+```bash
+kubectl get peerauthentication,destinationrule -n yas-dev
+kubectl get peerauthentication,destinationrule -n yas-staging
+```
+
+Kết quả mong đợi có:
+
+```text
+peerauthentication.security.istio.io/default
+destinationrule.networking.istio.io/default-istio-mutual
 ```
 
 ## 4. Test lại sau khi bật mesh
@@ -87,10 +105,14 @@ http://api-staging.yas.local.com/swagger-ui/
 Nếu cần test bằng curl ngay trên VM:
 
 ```bash
-curl -I -H "Host: storefront-dev.yas.local.com" http://127.0.0.1/
-curl -I -H "Host: api-dev.yas.local.com" http://127.0.0.1/swagger-ui/
-curl -I -H "Host: storefront-staging.yas.local.com" http://127.0.0.1/
-curl -I -H "Host: api-staging.yas.local.com" http://127.0.0.1/swagger-ui/
+./service-mesh/test-traffic.sh
+```
+
+Output nên có `HTTP/1.1 200 OK` hoặc redirect hợp lệ, và có header Envoy như:
+
+```text
+x-envoy-upstream-service-time
+x-envoy-decorator-operation
 ```
 
 ## 5. Hình nên chụp cho báo cáo
@@ -98,6 +120,9 @@ curl -I -H "Host: api-staging.yas.local.com" http://127.0.0.1/swagger-ui/
 - `kubectl get pods -n istio-system`.
 - `kubectl get ns yas-dev yas-staging --show-labels`.
 - Output `./service-mesh/verify-mesh.sh` có container `istio-proxy`.
+- `kubectl get peerauthentication,destinationrule -n yas-dev`.
+- `kubectl get peerauthentication,destinationrule -n yas-staging`.
+- Output `./service-mesh/test-traffic.sh` có header `x-envoy...`.
 - ArgoCD UI dạng cây cho app dev/staging.
 - Browser mở được storefront/backoffice/swagger sau khi bật mesh.
 
