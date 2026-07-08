@@ -114,15 +114,19 @@ def prepareJava21Build = {
 
 def publishBackendTestReports = { Map service ->
   junit testResults: "${service.context}/target/surefire-reports/*.xml,${service.context}/target/failsafe-reports/*.xml", allowEmptyResults: true
-  recordCoverage(
-    id: "coverage-${service.name}",
-    name: "Coverage: ${service.name}",
-    tools: [[parser: 'JACOCO', pattern: "${service.context}/target/site/jacoco/jacoco.xml"]],
-    enabledForFailure: true,
-    qualityGates: [
-      [threshold: params.COVERAGE_THRESHOLD as Double, metric: 'LINE', baseline: 'PROJECT', criticality: 'FAILURE']
-    ]
-  )
+  if (params.ENABLE_COVERAGE_PUBLISH) {
+    recordCoverage(
+      id: "coverage-${service.name}",
+      name: "Coverage: ${service.name}",
+      tools: [[parser: 'JACOCO', pattern: "${service.context}/target/site/jacoco/jacoco.xml"]],
+      enabledForFailure: true,
+      qualityGates: [
+        [threshold: params.COVERAGE_THRESHOLD as Double, metric: 'LINE', baseline: 'PROJECT', criticality: 'FAILURE']
+      ]
+    )
+  } else {
+    echo "Coverage publishing is disabled. Set ENABLE_COVERAGE_PUBLISH=true after installing Jenkins Coverage plugin."
+  }
 }
 
 def testBackendService = { Map service ->
@@ -292,6 +296,7 @@ pipeline {
     string(name: 'GITOPS_COMMIT_EMAIL', defaultValue: 'jenkins@local', description: 'Git author email for GitOps commits')
     booleanParam(name: 'PUSH_GITOPS', defaultValue: true, description: 'Push GitOps changes to origin/main')
     string(name: 'COVERAGE_THRESHOLD', defaultValue: '70.0', description: 'Minimum coverage percentage required by Jenkins Coverage plugin')
+    booleanParam(name: 'ENABLE_COVERAGE_PUBLISH', defaultValue: false, description: 'Publish JaCoCo coverage with Jenkins Coverage plugin')
     booleanParam(name: 'ENABLE_GITLEAKS', defaultValue: true, description: 'Run Gitleaks secret scanning')
     booleanParam(name: 'ENABLE_SONAR', defaultValue: true, description: 'Run SonarQube/SonarCloud quality scan')
     string(name: 'SONARQUBE_ENV', defaultValue: 'SonarQube-Local', description: 'Jenkins SonarQube server config name')
