@@ -256,6 +256,13 @@ def runSnykScan = { Map service ->
 def buildAndPushImage = { Map service, String commitTag, String branchName ->
   def image = "${params.DOCKERHUB_USERNAME}/${service.image}:${commitTag}"
 
+  if (service.name == 'media') {
+    sh '''
+      rm -rf media/images
+      cp -a sampledata/images media/images
+    '''
+  }
+
   sh "docker build -t ${image} ${service.context}"
   sh "docker push ${image}"
 

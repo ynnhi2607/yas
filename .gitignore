@@ -30,3 +30,6 @@ hs_err_pid*
 .settings*
 .vscode
 *.iml
+
+# Copied into the media Docker build context by Jenkins.
+media/images/

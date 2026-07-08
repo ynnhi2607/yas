@@ -67,6 +67,7 @@ default_image_repo_for() {
   case "$service" in
     storefront-ui) echo "${DOCKERHUB_USERNAME}/yas-storefront" ;;
     backoffice-ui) echo "${DOCKERHUB_USERNAME}/yas-backoffice" ;;
+    media) echo "${DOCKERHUB_USERNAME}/yas-media" ;;
     sampledata) echo "${DOCKERHUB_USERNAME}/yas-sampledata" ;;
     *) echo "ghcr.io/nashtech-garage/yas-${service}" ;;
   esac
