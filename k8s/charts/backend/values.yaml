@@ -80,6 +80,11 @@ extraVolumeMounts: []
 #  - mountPath: /example-path
 #    name: volume-extra-example
 
+extraInitContainers: []
+#  - name: init-extra-example
+#    image: busybox
+#    command: ["sh", "-c", "echo init"]
+
 extraApplicationConfigPaths: []
 #  - /opt/config/application-example.yaml
 

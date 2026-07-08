@@ -380,6 +380,8 @@ mediaApplicationConfig:
   server:
     servlet:
       context-path: /media
+  file:
+    directory: /images/
   yas:
     publicUrl: http://api.yas.local.com/media
 
@@ -395,7 +397,7 @@ customerApplicationConfig:
 # Search application config custom
 searchApplicationConfig:
   elasticsearch:
-    url: elasticsearch-es-http.elasticsearch
+    url: elasticsearch-es-http.elasticsearch:9200
     username: ${ELASTICSEARCH_USERNAME}
     password: ${ELASTICSEARCH_PASSWORD}
 
