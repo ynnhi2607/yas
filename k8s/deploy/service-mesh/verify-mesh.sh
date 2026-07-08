@@ -13,6 +13,7 @@ for namespace in $MESH_NAMESPACES; do
   kubectl get namespace "$namespace" --show-labels
   kubectl get peerauthentication -n "$namespace" || true
   kubectl get destinationrule -n "$namespace" || true
+  kubectl get authorizationpolicy -n "$namespace" || true
   kubectl get pods -n "$namespace"
 
   echo
