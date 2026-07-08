@@ -1,4 +1,4 @@
-DELETE FROM media;
+TRUNCATE TABLE media RESTART IDENTITY CASCADE;
 INSERT INTO media (id, file_name, file_path, media_type) VALUES(1, 'phone_category.jpg', '/images/sample/category/phone_category.jpg', 'image/jpeg');
 INSERT INTO media (id, file_name, file_path, media_type) VALUES(2, 'tablet_category.jpg', '/images/sample/category/tablet_category.jpg', 'image/jpeg');
 INSERT INTO media (id, file_name, file_path, media_type) VALUES(3, 'Samsung_category.jpg', '/images/sample/category/Samsung_category.jpg', 'image/jpeg');

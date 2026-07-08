@@ -1,7 +1,9 @@
 package com.yas.sampledata.utils;
 
+import java.io.IOException;
 import java.sql.Connection;
-import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.Comparator;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -17,12 +19,13 @@ public class SqlScriptExecutor {
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         try {
             Resource[] resources = resolver.getResources(locationPattern);
+            Arrays.sort(resources, Comparator.comparing(this::resourceName));
 
             for (Resource resource : resources) {
                 executeSqlScript(dataSource, schema, resource);
             }
         } catch (Exception e) {
-            log.error(e.getMessage());
+            throw new IllegalStateException("Failed to execute sample data scripts from " + locationPattern, e);
         }
     }
 
@@ -30,9 +33,18 @@ public class SqlScriptExecutor {
         try (Connection connection = dataSource.getConnection()) {
             connection.setSchema(schema); // Set the schema
             ScriptUtils.executeSqlScript(connection, resource);
-            log.info("Executed script: " + resource.getFilename() + " on schema: " + schema);
-        } catch (SQLException e) {
-            log.error(e.getMessage());
+            log.info("Executed script: {} on schema: {}", resourceName(resource), schema);
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                "Failed to execute script " + resourceName(resource) + " on schema " + schema, e);
+        }
+    }
+
+    private String resourceName(Resource resource) {
+        try {
+            return resource.getURL().toString();
+        } catch (IOException e) {
+            return resource.getFilename();
         }
     }
 }
