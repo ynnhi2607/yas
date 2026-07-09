@@ -43,12 +43,16 @@ urls: "[{ url: 'http://api.yas.local.com/product/v3/api-docs', name: 'Product' }
       { url: 'http://api.yas.local.com/cart/v3/api-docs', name: 'Cart' },
       { url: 'http://api.yas.local.com/order/v3/api-docs', name: 'Order' },
       { url: 'http://api.yas.local.com/inventory/v3/api-docs', name: 'Inventory' },
+      { url: 'http://api.yas.local.com/location/v3/api-docs', name: 'Location' },
+      { url: 'http://api.yas.local.com/payment/v3/api-docs', name: 'Payment' },
+      { url: 'http://api.yas.local.com/payment-paypal/v3/api-docs', name: 'Payment Paypal' },
       { url: 'http://api.yas.local.com/tax/v3/api-docs', name: 'Tax' },
       { url: 'http://api.yas.local.com/search/v3/api-docs', name: 'Search' }]"
 
 service:
   type: ClusterIP
   port: 8080
+  nodePort: null
 
 ingress:
   enabled: true
@@ -85,6 +89,18 @@ ingress:
         - path: /inventory
           pathType: Prefix
           serviceName: inventory
+          servicePort: 80
+        - path: /location
+          pathType: Prefix
+          serviceName: location
+          servicePort: 80
+        - path: /payment
+          pathType: Prefix
+          serviceName: payment
+          servicePort: 80
+        - path: /payment-paypal
+          pathType: Prefix
+          serviceName: payment-paypal
           servicePort: 80
         - path: /tax
           pathType: Prefix

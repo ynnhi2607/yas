@@ -13,7 +13,10 @@ RELEASES=(
   sampledata
   search
   media
+  payment-paypal
+  payment
   tax
+  location
   inventory
   customer
   order

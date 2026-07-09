@@ -22,7 +22,7 @@ case "$ENVIRONMENT" in
 esac
 
 case "$SERVICE" in
-  product|cart|order|customer|inventory|tax|media|search|storefront-bff|backoffice-bff|storefront-ui|backoffice-ui|sampledata) ;;
+  product|cart|order|customer|inventory|location|tax|payment|payment-paypal|media|search|storefront-bff|backoffice-bff|storefront-ui|backoffice-ui|sampledata) ;;
   *)
     echo "Unsupported service '${SERVICE}' for GitOps update" >&2
     exit 1

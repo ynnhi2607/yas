@@ -23,7 +23,10 @@ SERVICES=(
   order
   customer
   inventory
+  location
   tax
+  payment
+  payment-paypal
   media
   search
   storefront-bff
