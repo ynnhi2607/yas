@@ -7,7 +7,6 @@ def backendServices = [
   [name: 'location', image: 'yas-location', context: 'location'],
   [name: 'tax', image: 'yas-tax', context: 'tax'],
   [name: 'payment', image: 'yas-payment', context: 'payment'],
-  [name: 'payment-paypal', image: 'yas-payment-paypal', context: 'payment-paypal'],
   [name: 'media', image: 'yas-media', context: 'media'],
   [name: 'search', image: 'yas-search', context: 'search'],
   [name: 'storefront-bff', image: 'yas-storefront-bff', context: 'storefront-bff'],

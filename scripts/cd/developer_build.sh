@@ -20,7 +20,6 @@ BACKEND_SERVICES=(
   location
   tax
   payment
-  payment-paypal
   media
   search
   storefront-bff
