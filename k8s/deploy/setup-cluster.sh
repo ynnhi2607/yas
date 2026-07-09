@@ -36,9 +36,8 @@ pg_admin_hostname="pgadmin.$DOMAIN" yq -i '.hostname=env(pg_admin_hostname)' ./p
 helm upgrade --install pgadmin ./postgres/pgadmin \
 --create-namespace --namespace postgres \
 
-#Install strimzi-kafka-operator
-helm upgrade --install kafka-operator strimzi/strimzi-kafka-operator \
---create-namespace --namespace kafka
+#Install strimzi-kafka-operator with the matching CRD bundle.
+./kafka/install-strimzi.sh
 
 #Install kafka and postgresql connector
 helm upgrade --install kafka-cluster ./kafka/kafka-cluster \

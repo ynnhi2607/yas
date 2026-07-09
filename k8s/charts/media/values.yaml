@@ -6,7 +6,7 @@ backend:
   nameOverride: media
   fullnameOverride: media
   hostAliases:
-    - ip: 10.107.223.248
+    - ip: 10.43.199.254
       hostnames:
         - identity.yas.local.com
   databaseName: media
@@ -16,8 +16,42 @@ backend:
     - name: media-application
       configMap:
         name: media-application-configmap
+    - name: media-images
+      persistentVolumeClaim:
+        claimName: media-images-pvc
   extraVolumeMounts:
     - name: media-application
       mountPath: /opt/yas/media
+    - name: media-images
+      mountPath: /images
   extraApplicationConfigPaths:
     - /opt/yas/media/media-application.yaml
+  extraInitContainers:
+    - name: seed-sample-images
+      image: ynnhi2607/yas-sampledata:latest
+      command:
+        - sh
+        - -c
+        - |
+          set -eu
+          if [ ! -f /images/.sample-images-seeded ]; then
+            echo "Copying sample images..."
+            cp -a /sample-images/. /images/
+            touch /images/.sample-images-seeded
+          else
+            echo "Sample images already seeded."
+          fi
+      volumeMounts:
+        - name: media-images
+          mountPath: /images
+  extraObjects:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: media-images-pvc
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi

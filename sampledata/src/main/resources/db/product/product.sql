@@ -1,17 +1,19 @@
-DELETE FROM product_attribute_template;
-DELETE FROM product_attribute_value;
-DELETE FROM product_attribute;
-DELETE FROM product_attribute_group;
-DELETE FROM product_category;
-DELETE FROM product_image;
-DELETE FROM product_option_combination;
-DELETE FROM product_option_value;
-DELETE FROM product_option;
-DELETE FROM product_related;
-DELETE FROM product_template;
-DELETE FROM product;
-DELETE FROM brand;
-DELETE FROM category;
+TRUNCATE TABLE
+    product_attribute_template,
+    product_attribute_value,
+    product_attribute,
+    product_attribute_group,
+    product_category,
+    product_image,
+    product_option_combination,
+    product_option_value,
+    product_option,
+    product_related,
+    product_template,
+    product,
+    brand,
+    category
+RESTART IDENTITY CASCADE;
 
 INSERT INTO brand (id, "name", slug, is_published)
 VALUES (1, 'Apple', 'apple', true);

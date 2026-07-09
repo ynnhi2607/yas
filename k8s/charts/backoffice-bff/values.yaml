@@ -6,7 +6,7 @@ backend:
   nameOverride: backoffice-bff
   fullnameOverride: backoffice-bff
   hostAliases:
-    - ip: 10.107.223.248
+    - ip: 10.43.199.254
       hostnames:
         - identity.yas.local.com
   deployment:

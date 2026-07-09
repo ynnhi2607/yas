@@ -36,6 +36,15 @@ spec:
       hostAliases:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if or .Values.initContainers .Values.extraInitContainers }}
+      initContainers:
+        {{- if .Values.initContainers }}
+        {{- tpl (toYaml .Values.initContainers) . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.extraInitContainers }}
+        {{- tpl (toYaml .Values.extraInitContainers) . | nindent 8 }}
+        {{- end }}
+      {{- end }}
       volumes:
         - name: yas-configuration
           configMap:
