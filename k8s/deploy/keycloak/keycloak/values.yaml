@@ -10,3 +10,6 @@ postgresql:
 bootstrapAdmin:
   username: admin
   password: admin
+
+theme:
+  enabled: true
