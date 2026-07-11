@@ -7,6 +7,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 
 @TestConfiguration
 public class IntegrationTestConfiguration {
@@ -22,7 +23,12 @@ public class IntegrationTestConfiguration {
     public KeycloakContainer keycloakContainer() {
         return new KeycloakContainer("quay.io/keycloak/keycloak:26.0")
             .withRealmImportFiles("/test-realm.json")
-            .withStartupTimeout(Duration.ofMinutes(5))
+            .withEnv("KC_HEALTH_ENABLED", "true")
+            .waitingFor(Wait.forHttp("/realms/quarkus")
+                .forPort(8080)
+                .forStatusCode(200)
+                .withStartupTimeout(Duration.ofMinutes(10)))
+            .withStartupTimeout(Duration.ofMinutes(10))
             .withReuse(true);
     }
 
