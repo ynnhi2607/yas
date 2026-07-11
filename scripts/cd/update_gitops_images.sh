@@ -23,7 +23,9 @@ SERVICES=(
   order
   customer
   inventory
+  location
   tax
+  payment
   media
   search
   storefront-bff

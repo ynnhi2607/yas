@@ -9,6 +9,7 @@ DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-ynnhi2607}"
 MAIN_TAG="${MAIN_TAG:-latest}"
 DEPLOY_CONFIG="${DEPLOY_CONFIG:-true}"
 DEPLOY_SAMPLEDATA="${DEPLOY_SAMPLEDATA:-false}"
+ENABLE_NODEPORT="${ENABLE_NODEPORT:-true}"
 
 BACKEND_SERVICES=(
   product
@@ -16,7 +17,9 @@ BACKEND_SERVICES=(
   order
   customer
   inventory
+  location
   tax
+  payment
   media
   search
   storefront-bff
@@ -132,6 +135,17 @@ image_repo_for_branch() {
   fi
 }
 
+node_port_for() {
+  case "$1" in
+    storefront-ui) echo 30280 ;;
+    backoffice-ui) echo 30281 ;;
+    storefront-bff) echo 30282 ;;
+    backoffice-bff) echo 30283 ;;
+    swagger-ui) echo 30284 ;;
+    *) return 1 ;;
+  esac
+}
+
 build_chart_dependencies() {
   local chart="$1"
   if [[ -f "${chart}/Chart.yaml" ]]; then
@@ -166,6 +180,13 @@ deploy_backend_service() {
     )
   fi
 
+  if [[ "$ENABLE_NODEPORT" == "true" ]] && node_port_for "$service" >/dev/null; then
+    helm_args+=(
+      --set "backend.service.type=NodePort"
+      --set "backend.service.nodePort=$(node_port_for "$service")"
+    )
+  fi
+
   helm "${helm_args[@]}"
 }
 
@@ -180,11 +201,22 @@ deploy_ui_service() {
   build_chart_dependencies "$chart"
 
   echo "Deploy ${service}: branch=${branch}, image=${repo}:${tag}"
-  helm upgrade --install "$service" "$chart" \
+  local helm_args=(
+    upgrade --install "$service" "$chart"
     --namespace "$NAMESPACE" \
     --create-namespace \
     --set "ui.image.repository=${repo}" \
     --set "ui.image.tag=${tag}"
+  )
+
+  if [[ "$ENABLE_NODEPORT" == "true" ]] && node_port_for "$service" >/dev/null; then
+    helm_args+=(
+      --set "ui.service.type=NodePort"
+      --set "ui.service.nodePort=$(node_port_for "$service")"
+    )
+  fi
+
+  helm "${helm_args[@]}"
 }
 
 print_urls() {
@@ -195,6 +227,15 @@ print_urls() {
   echo "  http://storefront.yas.local.com"
   echo "  http://backoffice.yas.local.com"
   echo "  http://api.yas.local.com/swagger-ui/"
+  if [[ "$ENABLE_NODEPORT" == "true" ]]; then
+    echo
+    echo "NodePort URLs:"
+    echo "  storefront-ui:  http://<vm-ip>:30280"
+    echo "  backoffice-ui:  http://<vm-ip>:30281"
+    echo "  storefront-bff: http://<vm-ip>:30282"
+    echo "  backoffice-bff: http://<vm-ip>:30283"
+    echo "  swagger-ui:     http://<vm-ip>:30284/swagger-ui"
+  fi
   echo
   echo "If the VM IP changed, update your hosts file or run:"
   echo "  HOST_IP=<vm-ip> ./scripts/cd/print_demo_urls.sh"
@@ -217,9 +258,20 @@ for service in "${UI_SERVICES[@]}"; do
   deploy_ui_service "$service"
 done
 
-helm upgrade --install swagger-ui "${CHARTS_DIR}/swagger-ui" \
-  --namespace "$NAMESPACE" \
+swagger_args=(
+  upgrade --install swagger-ui "${CHARTS_DIR}/swagger-ui"
+  --namespace "$NAMESPACE"
   --create-namespace
+)
+
+if [[ "$ENABLE_NODEPORT" == "true" ]]; then
+  swagger_args+=(
+    --set "service.type=NodePort"
+    --set "service.nodePort=$(node_port_for swagger-ui)"
+  )
+fi
+
+helm "${swagger_args[@]}"
 
 kubectl get pods -n "$NAMESPACE"
 print_urls

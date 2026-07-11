@@ -45,3 +45,19 @@ http://storefront-staging.yas.local.com
 http://backoffice-staging.yas.local.com
 http://api-staging.yas.local.com/swagger-ui/
 URLS
+
+echo
+echo "NodePort URLs, if the K3d cluster exposes NodePort traffic on the VM:"
+cat <<URLS
+Dev storefront UI:  http://${HOST_IP}:30080
+Dev backoffice UI:  http://${HOST_IP}:30081
+Dev storefront BFF: http://${HOST_IP}:30082
+Dev backoffice BFF: http://${HOST_IP}:30083
+Dev swagger UI:     http://${HOST_IP}:30084/swagger-ui
+
+Staging storefront UI:  http://${HOST_IP}:30180
+Staging backoffice UI:  http://${HOST_IP}:30181
+Staging storefront BFF: http://${HOST_IP}:30182
+Staging backoffice BFF: http://${HOST_IP}:30183
+Staging swagger UI:     http://${HOST_IP}:30184/swagger-ui
+URLS

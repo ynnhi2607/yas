@@ -4,7 +4,9 @@ def services = [
   [name: 'order'],
   [name: 'customer'],
   [name: 'inventory'],
+  [name: 'location'],
   [name: 'tax'],
+  [name: 'payment'],
   [name: 'media'],
   [name: 'search'],
   [name: 'storefront-bff'],
@@ -43,7 +45,9 @@ pipeline {
     string(name: 'ORDER_BRANCH', defaultValue: 'main', description: 'Branch or commit for order')
     string(name: 'CUSTOMER_BRANCH', defaultValue: 'main', description: 'Branch or commit for customer')
     string(name: 'INVENTORY_BRANCH', defaultValue: 'main', description: 'Branch or commit for inventory')
+    string(name: 'LOCATION_BRANCH', defaultValue: 'main', description: 'Branch or commit for location')
     string(name: 'TAX_BRANCH', defaultValue: 'main', description: 'Branch or commit for tax')
+    string(name: 'PAYMENT_BRANCH', defaultValue: 'main', description: 'Branch or commit for payment')
     string(name: 'MEDIA_BRANCH', defaultValue: 'main', description: 'Branch or commit for media')
     string(name: 'SEARCH_BRANCH', defaultValue: 'main', description: 'Branch or commit for search')
     string(name: 'STOREFRONT_BFF_BRANCH', defaultValue: 'main', description: 'Branch or commit for storefront-bff')

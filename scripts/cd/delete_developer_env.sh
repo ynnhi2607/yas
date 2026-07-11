@@ -13,7 +13,9 @@ RELEASES=(
   sampledata
   search
   media
+  payment
   tax
+  location
   inventory
   customer
   order

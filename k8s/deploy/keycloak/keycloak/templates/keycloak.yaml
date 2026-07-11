@@ -29,6 +29,7 @@ spec:
   ingress:
     enabled: true
     className: nginx
+  {{- if .Values.theme.enabled }}
   unsupported:
     podTemplate:
       spec:
@@ -41,3 +42,4 @@ spec:
             volumeMounts:
               - name: yas-themes
                 mountPath: /opt/keycloak/providers
+  {{- end }}
