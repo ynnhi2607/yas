@@ -31,7 +31,7 @@ class ProductServiceTest {
     @BeforeEach
     void setUp() {
         restClient = Mockito.mock(RestClient.class);
-        serviceUrlConfig = Mockito.mock(ServiceUrlConfig.class);
+        serviceUrlConfig = new ServiceUrlConfig(null, "http://api.yas.local/media");
         productService = new ProductService(restClient, serviceUrlConfig);
         requestHeadersUriSpec = Mockito.mock(RestClient.RequestHeadersUriSpec.class);
         responseSpec = Mockito.mock(RestClient.ResponseSpec.class);
@@ -48,7 +48,6 @@ class ProductServiceTest {
             .build()
             .toUri();
 
-        when(serviceUrlConfig.product()).thenReturn("http://api.yas.local/media");
         when(restClient.get()).thenReturn(requestHeadersUriSpec);
         when(requestHeadersUriSpec.uri(url)).thenReturn(requestHeadersUriSpec);
         when(requestHeadersUriSpec.retrieve()).thenReturn(responseSpec);
