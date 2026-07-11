@@ -1,44 +1,48 @@
 def services = [
-  [name: 'product'],
-  [name: 'cart'],
-  [name: 'order'],
-  [name: 'customer'],
-  [name: 'inventory'],
-  [name: 'location'],
-  [name: 'tax'],
-  [name: 'payment'],
-  [name: 'media'],
-  [name: 'search'],
-  [name: 'storefront-bff'],
-  [name: 'backoffice-bff'],
-  [name: 'storefront-ui'],
-  [name: 'backoffice-ui'],
-  [name: 'sampledata']
+  'product',
+  'cart',
+  'order',
+  'customer',
+  'inventory',
+  'location',
+  'tax',
+  'payment',
+  'media',
+  'search',
+  'storefront-bff',
+  'backoffice-bff',
+  'storefront-ui',
+  'backoffice-ui',
+  'sampledata'
 ]
 
 def branchParamName(String serviceName) {
   return serviceName.toUpperCase().replace('-', '_') + '_BRANCH'
 }
 
-def branchFor(Map service) {
-  def paramName = branchParamName(service.name)
+def branchFor(String serviceName) {
+  def paramName = branchParamName(serviceName)
   return params[paramName]?.trim() ?: 'main'
 }
 
 pipeline {
   agent any
 
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+  }
+
   parameters {
-    string(name: 'NAMESPACE', defaultValue: 'yas', description: 'Kubernetes namespace to deploy to')
+    choice(name: 'TARGET_ENV', choices: ['dev', 'staging'], description: 'GitOps environment to update')
     string(name: 'DOCKERHUB_USERNAME', defaultValue: 'ynnhi2607', description: 'Docker Hub username/org')
-    booleanParam(name: 'DEPLOY_SAMPLEDATA', defaultValue: false, description: 'Run sampledata once when seeding demo data')
-    booleanParam(name: 'UPDATE_GITOPS', defaultValue: false, description: 'Commit selected image tags to the yas-gitops repo for ArgoCD')
-    booleanParam(name: 'PUSH_GITOPS', defaultValue: false, description: 'Push the GitOps commit to origin/main. Keep false for dry run.')
-    choice(name: 'GITOPS_ENVIRONMENT', choices: ['dev', 'staging'], description: 'GitOps environment values to update')
     string(name: 'GITOPS_REPO_URL', defaultValue: 'https://github.com/ynnhi2607/yas-gitops.git', description: 'GitOps repository URL')
     string(name: 'GITOPS_REPO_DIR', defaultValue: '../yas-gitops', description: 'Local GitOps checkout path from the Jenkins workspace')
     string(name: 'GITOPS_CREDENTIALS_ID', defaultValue: 'github-token', description: 'Jenkins Secret text credential with GitHub token')
-    string(name: 'GITOPS_MAIN_TAG', defaultValue: 'latest', description: 'Image tag to write for services that use main')
+    string(name: 'GITOPS_MAIN_TAG', defaultValue: 'latest', description: 'Image tag for services that use main')
+    booleanParam(name: 'VERIFY_IMAGES', defaultValue: true, description: 'Verify non-main images exist before updating GitOps')
+    booleanParam(name: 'DRY_RUN', defaultValue: true, description: 'Only create local GitOps commit; do not push')
 
     string(name: 'PRODUCT_BRANCH', defaultValue: 'main', description: 'Branch or commit for product')
     string(name: 'CART_BRANCH', defaultValue: 'main', description: 'Branch or commit for cart')
@@ -58,95 +62,43 @@ pipeline {
   }
 
   stages {
-    stage('Checkout pipeline repo') {
+    stage('Checkout') {
       steps {
         checkout scm
         sh 'rm -f .jenkins-deploy-env'
       }
     }
 
-    stage('Check Jenkins tools') {
-      steps {
-        sh '''
-          kubectl version --client=true
-          helm version
-          helm repo add stakater https://stakater.github.io/stakater-charts || true
-          helm repo update
-          kubectl get nodes
-        '''
-      }
-    }
-
-    stage('Deploy developer build') {
+    stage('Resolve branches to image tags') {
       steps {
         script {
-          def deployEnv = services.collect { service ->
-            "${branchParamName(service.name)}=${branchFor(service)}"
+          def deployEnv = services.collect { serviceName ->
+            "${branchParamName(serviceName)}=${branchFor(serviceName)}"
           }.join('\n') + '\n'
-          writeFile file: '.jenkins-deploy-env', text: deployEnv
-        }
-        sh '''
-          set -a
-          if [ -f .jenkins-deploy-env ]; then
-            . ./.jenkins-deploy-env
-          fi
-          set +a
 
-          chmod +x scripts/cd/developer_build.sh
-          NAMESPACE="${NAMESPACE}" \
-          DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME}" \
-          DEPLOY_SAMPLEDATA="${DEPLOY_SAMPLEDATA}" \
-          PRODUCT_BRANCH="${PRODUCT_BRANCH}" \
-          PRODUCT_BRANCH_COMMIT="${PRODUCT_BRANCH_COMMIT:-}" \
-          CART_BRANCH="${CART_BRANCH}" \
-          CART_BRANCH_COMMIT="${CART_BRANCH_COMMIT:-}" \
-          ORDER_BRANCH="${ORDER_BRANCH}" \
-          ORDER_BRANCH_COMMIT="${ORDER_BRANCH_COMMIT:-}" \
-          CUSTOMER_BRANCH="${CUSTOMER_BRANCH}" \
-          CUSTOMER_BRANCH_COMMIT="${CUSTOMER_BRANCH_COMMIT:-}" \
-          INVENTORY_BRANCH="${INVENTORY_BRANCH}" \
-          INVENTORY_BRANCH_COMMIT="${INVENTORY_BRANCH_COMMIT:-}" \
-          TAX_BRANCH="${TAX_BRANCH}" \
-          TAX_BRANCH_COMMIT="${TAX_BRANCH_COMMIT:-}" \
-          MEDIA_BRANCH="${MEDIA_BRANCH}" \
-          MEDIA_BRANCH_COMMIT="${MEDIA_BRANCH_COMMIT:-}" \
-          SEARCH_BRANCH="${SEARCH_BRANCH}" \
-          SEARCH_BRANCH_COMMIT="${SEARCH_BRANCH_COMMIT:-}" \
-          STOREFRONT_BFF_BRANCH="${STOREFRONT_BFF_BRANCH}" \
-          STOREFRONT_BFF_BRANCH_COMMIT="${STOREFRONT_BFF_BRANCH_COMMIT:-}" \
-          BACKOFFICE_BFF_BRANCH="${BACKOFFICE_BFF_BRANCH}" \
-          BACKOFFICE_BFF_BRANCH_COMMIT="${BACKOFFICE_BFF_BRANCH_COMMIT:-}" \
-          STOREFRONT_UI_BRANCH="${STOREFRONT_UI_BRANCH}" \
-          STOREFRONT_UI_BRANCH_COMMIT="${STOREFRONT_UI_BRANCH_COMMIT:-}" \
-          BACKOFFICE_UI_BRANCH="${BACKOFFICE_UI_BRANCH}" \
-          BACKOFFICE_UI_BRANCH_COMMIT="${BACKOFFICE_UI_BRANCH_COMMIT:-}" \
-          SAMPLEDATA_BRANCH="${SAMPLEDATA_BRANCH}" \
-          SAMPLEDATA_BRANCH_COMMIT="${SAMPLEDATA_BRANCH_COMMIT:-}" \
-          ./scripts/cd/developer_build.sh
-        '''
+          writeFile file: '.jenkins-deploy-env', text: deployEnv
+          echo "Target environment: ${params.TARGET_ENV}"
+          echo "Branch plan:\n${deployEnv}"
+        }
       }
     }
 
-    stage('Update GitOps image tags') {
-      when {
-        expression { return params.UPDATE_GITOPS }
-      }
+    stage('Update GitOps values') {
       steps {
         withCredentials([string(credentialsId: params.GITOPS_CREDENTIALS_ID, variable: 'GITOPS_TOKEN')]) {
           sh '''
             set -a
-            if [ -f .jenkins-deploy-env ]; then
-              . ./.jenkins-deploy-env
-            fi
+            . ./.jenkins-deploy-env
             set +a
 
             chmod +x scripts/cd/update_gitops_images.sh
-            ENVIRONMENT="${GITOPS_ENVIRONMENT}" \
+            ENVIRONMENT="${TARGET_ENV}" \
             DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME}" \
             MAIN_TAG="${GITOPS_MAIN_TAG}" \
             GITOPS_REPO_URL="${GITOPS_REPO_URL}" \
             GITOPS_REPO_DIR="${GITOPS_REPO_DIR}" \
-            PUSH_GITOPS="${PUSH_GITOPS}" \
+            PUSH_GITOPS="$([ "${DRY_RUN}" = "true" ] && echo false || echo true)" \
+            VERIFY_GITOPS_IMAGES="${VERIFY_IMAGES}" \
             GITOPS_TOKEN="${GITOPS_TOKEN}" \
             GITOPS_COMMIT_USER="jenkins-bot" \
             GITOPS_COMMIT_EMAIL="jenkins@local" \
@@ -156,13 +108,22 @@ pipeline {
       }
     }
 
-    stage('Print test URLs') {
+    stage('Print access URLs') {
       steps {
         sh '''
           chmod +x scripts/cd/print_demo_urls.sh
           ./scripts/cd/print_demo_urls.sh
         '''
       }
+    }
+  }
+
+  post {
+    success {
+      echo 'developer_build SUCCESS. Wait for Argo CD sync, then test the printed URLs.'
+    }
+    failure {
+      echo 'developer_build FAILED. Check the stage logs above.'
     }
   }
 }

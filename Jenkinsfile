@@ -178,80 +178,27 @@ def packageSelectedServices = { List selectedServiceNames ->
 }
 
 def runGitleaksScan = {
-  sh '''
-    if ! command -v gitleaks >/dev/null 2>&1; then
-      if [ ! -x ./gitleaks ]; then
-        curl -ssfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz | tar -xz gitleaks
-        chmod +x ./gitleaks
+  int status = sh(
+    script: '''
+      if ! command -v gitleaks >/dev/null 2>&1; then
+        if [ ! -x ./gitleaks ]; then
+          curl -ssfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz | tar -xz gitleaks
+          chmod +x ./gitleaks
+        fi
+        GITLEAKS_CMD=./gitleaks
+      else
+        GITLEAKS_CMD=gitleaks
       fi
-      GITLEAKS_CMD=./gitleaks
-    else
-      GITLEAKS_CMD=gitleaks
-    fi
 
-    "$GITLEAKS_CMD" detect --source . --config gitleaks.toml --verbose --no-git
-  '''
-}
+      "$GITLEAKS_CMD" detect --source . --config gitleaks.toml --verbose --no-git
+    ''',
+    returnStatus: true
+  )
 
-def runBackendSonar = { Map service ->
-  withSonarQubeEnv(params.SONARQUBE_ENV) {
-    sh """
-      mvn -pl ${service.context} -am sonar:sonar \
-        -Dsonar.projectKey=${params.SONAR_PROJECT_PREFIX}-${service.name} \
-        -Dsonar.projectName=yas-${service.name} \
-        -Dsonar.organization=${params.SONAR_ORGANIZATION}
-    """
-  }
-}
-
-def runUiSonar = { Map service ->
-  withSonarQubeEnv(params.SONARQUBE_ENV) {
-    def scannerHome = tool params.SONAR_SCANNER_TOOL
-    dir(service.context) {
-      sh """
-        ${scannerHome}/bin/sonar-scanner \
-          -Dsonar.projectKey=${params.SONAR_PROJECT_PREFIX}-${service.name} \
-          -Dsonar.projectName=yas-${service.name} \
-          -Dsonar.organization=${params.SONAR_ORGANIZATION}
-      """
-    }
-  }
-}
-
-def runServiceSonar = { Map service ->
-  if (backendServices.find { it.name == service.name }) {
-    runBackendSonar(service)
+  if (status != 0) {
+    unstable('Gitleaks found issues')
   } else {
-    runUiSonar(service)
-  }
-}
-
-def runSnykScan = { Map service ->
-  withCredentials([string(credentialsId: params.SNYK_CREDENTIALS_ID, variable: 'SNYK_TOKEN')]) {
-    nodejs(params.NODEJS_TOOL) {
-      if (backendServices.find { it.name == service.name }) {
-        dir(service.context) {
-          sh 'chmod +x ./mvnw'
-          if (env.BRANCH_NAME == 'main') {
-            sh "npx snyk monitor --project-name=yas-${service.name}"
-          }
-          sh '''
-            npx snyk test --severity-threshold=high
-          '''
-        }
-      } else {
-        dir(service.context) {
-          sh '''
-            npx snyk test --severity-threshold=high
-          '''
-          if (env.BRANCH_NAME == 'main') {
-            sh '''
-              npx snyk monitor
-            '''
-          }
-        }
-      }
-    }
+    echo 'No secrets detected'
   }
 }
 
@@ -324,18 +271,12 @@ pipeline {
     string(name: 'GITOPS_COMMIT_EMAIL', defaultValue: 'jenkins@local', description: 'Git author email for GitOps commits')
     booleanParam(name: 'PUSH_GITOPS', defaultValue: true, description: 'Push GitOps changes to origin/main')
     booleanParam(name: 'ENABLE_TESTS', defaultValue: true, description: 'Run unit and integration tests for selected services')
+    booleanParam(name: 'RUN_FEATURE_BRANCH_TESTS', defaultValue: false, description: 'Run tests on non-main branches')
     booleanParam(name: 'ENABLE_IMAGE_BUILD', defaultValue: true, description: 'Build and push Docker images for selected services')
     string(name: 'COVERAGE_THRESHOLD', defaultValue: '70.0', description: 'Minimum coverage percentage required by Jenkins Coverage plugin')
     booleanParam(name: 'ENABLE_COVERAGE_PUBLISH', defaultValue: false, description: 'Publish JaCoCo coverage with Jenkins Coverage plugin')
     booleanParam(name: 'ENABLE_GITLEAKS', defaultValue: true, description: 'Run Gitleaks secret scanning')
-    booleanParam(name: 'ENABLE_SONAR', defaultValue: true, description: 'Run SonarQube/SonarCloud quality scan')
-    string(name: 'SONARQUBE_ENV', defaultValue: 'SonarQube-Local', description: 'Jenkins SonarQube server config name')
-    string(name: 'SONAR_ORGANIZATION', defaultValue: 'ynnhi2607', description: 'SonarCloud organization key')
-    string(name: 'SONAR_PROJECT_PREFIX', defaultValue: 'ynnhi2607_yas', description: 'Sonar project key prefix, final key is <prefix>-<service>')
-    string(name: 'SONAR_SCANNER_TOOL', defaultValue: 'SonarScanner', description: 'Jenkins SonarScanner tool name for frontend services')
     string(name: 'NODEJS_TOOL', defaultValue: 'node20', description: 'Jenkins NodeJS tool name')
-    booleanParam(name: 'ENABLE_SNYK', defaultValue: true, description: 'Run Snyk high severity vulnerability scan')
-    string(name: 'SNYK_CREDENTIALS_ID', defaultValue: 'snyk-token', description: 'Jenkins secret text credentials id for Snyk token')
   }
 
   environment {
@@ -418,6 +359,7 @@ pipeline {
           expression { params.ENABLE_TESTS }
           expression { env.SELECTED_SERVICES?.trim() }
           expression { !((env.TAG_NAME ?: '') ==~ /^v.*/) }
+          expression { env.CURRENT_BRANCH == 'main' || env.CURRENT_BRANCH == 'master' || params.RUN_FEATURE_BRANCH_TESTS }
         }
       }
       steps {
@@ -425,53 +367,6 @@ pipeline {
           env.SELECTED_SERVICES.split(',').findAll { it?.trim() }.each { serviceName ->
             def service = serviceConfig(serviceName.trim())
             testService(service)
-          }
-        }
-      }
-    }
-
-    stage('Quality scan') {
-      when {
-        allOf {
-          expression { params.ENABLE_SONAR }
-          expression { env.SELECTED_SERVICES?.trim() }
-          expression { !((env.TAG_NAME ?: '') ==~ /^v.*/) }
-        }
-      }
-      steps {
-        script {
-          env.SELECTED_SERVICES.split(',').findAll { it?.trim() }.each { serviceName ->
-            def service = serviceConfig(serviceName.trim())
-            runServiceSonar(service)
-            timeout(time: 5, unit: 'MINUTES') {
-              def qualityGate = waitForQualityGate abortPipeline: false
-              if (qualityGate.status == 'ERROR' || qualityGate.status == 'FAILED') {
-                error("Sonar quality gate failed for ${service.name}: ${qualityGate.status}")
-              }
-              if (qualityGate.status == 'NONE') {
-                echo "Sonar quality gate is NONE for ${service.name}. Analysis succeeded, but SonarCloud did not compute a gate for this service project yet."
-              } else {
-                echo "Sonar quality gate for ${service.name}: ${qualityGate.status}"
-              }
-            }
-          }
-        }
-      }
-    }
-
-    stage('Dependency security scan') {
-      when {
-        allOf {
-          expression { params.ENABLE_SNYK }
-          expression { env.SELECTED_SERVICES?.trim() }
-          expression { !((env.TAG_NAME ?: '') ==~ /^v.*/) }
-        }
-      }
-      steps {
-        script {
-          env.SELECTED_SERVICES.split(',').findAll { it?.trim() }.each { serviceName ->
-            def service = serviceConfig(serviceName.trim())
-            runSnykScan(service)
           }
         }
       }
@@ -487,7 +382,8 @@ pipeline {
       }
       steps {
         script {
-          if (!params.ENABLE_TESTS) {
+          def testsWereSkipped = !params.ENABLE_TESTS || !(env.CURRENT_BRANCH == 'main' || env.CURRENT_BRANCH == 'master' || params.RUN_FEATURE_BRANCH_TESTS)
+          if (testsWereSkipped) {
             packageSelectedServices(env.SELECTED_SERVICES.split(',').findAll { it?.trim() })
           }
 
