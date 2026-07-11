@@ -7,7 +7,10 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.containers.KafkaContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
+
+import java.time.Duration;
 
 @TestConfiguration
 public class SearchIntegrationTestConfiguration {
@@ -48,6 +51,12 @@ public class SearchIntegrationTestConfiguration {
     public KeycloakContainer keycloakContainer() {
         return new KeycloakContainer("quay.io/keycloak/keycloak:26.0")
             .withRealmImportFiles("/test-realm.json")
+            .withEnv("KC_HEALTH_ENABLED", "true")
+            .waitingFor(Wait.forHttp("/realms/quarkus")
+                .forPort(8080)
+                .forStatusCode(200)
+                .withStartupTimeout(Duration.ofMinutes(10)))
+            .withStartupTimeout(Duration.ofMinutes(10))
             .withReuse(true);
     }
 

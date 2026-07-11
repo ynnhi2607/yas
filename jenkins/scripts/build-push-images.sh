@@ -24,6 +24,18 @@ push_image_with_retry() {
   done
 }
 
+build_image_with_retry() {
+  local image="$1"
+  local context="$2"
+
+  if docker build --pull -t "$image" "$context"; then
+    return 0
+  fi
+
+  echo "Docker build failed for ${image}. Retrying once without cache..."
+  docker build --pull --no-cache -t "$image" "$context"
+}
+
 image_name_for() {
   case "$1" in
     backoffice) printf 'yas-backoffice' ;;
@@ -54,7 +66,7 @@ for service in "${docker_services[@]}"; do
     cp -a sampledata/images media/images
   fi
 
-  docker build --pull -t "$image" "$service"
+  build_image_with_retry "$image" "$service"
   push_image_with_retry "$image"
 
   if [[ "${BRANCH_NAME:-}" == "main" ]]; then

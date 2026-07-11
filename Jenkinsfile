@@ -4,6 +4,7 @@ pipeline {
   parameters {
     booleanParam(name: 'BUILD_ALL', defaultValue: false, description: 'Build all Maven and Docker services')
     booleanParam(name: 'RUN_FEATURE_BRANCH_TESTS', defaultValue: false, description: 'Run full tests on non-main branches')
+    booleanParam(name: 'RUN_INTEGRATION_TESTS', defaultValue: false, description: 'Run Testcontainers integration tests')
   }
 
   options {
@@ -15,7 +16,7 @@ pipeline {
 
   environment {
     MVN_ARGS = '-B -ntp'
-    DOCKER_BUILDKIT = '0'
+    DOCKER_BUILDKIT = '1'
     TESTCONTAINERS_RYUK_DISABLED = 'true'
     TESTCONTAINERS_HOST_OVERRIDE = 'host.docker.internal'
     DOCKERHUB_NAMESPACE = 'ynnhi2607'
@@ -77,7 +78,7 @@ pipeline {
       }
     }
 
-    stage('Unit & Integration Tests') {
+    stage('Tests') {
       when {
         expression {
           env.AFFECTED_MODULES?.trim() &&
@@ -88,15 +89,28 @@ pipeline {
         timeout(time: 30, unit: 'MINUTES')
       }
       steps {
-        sh '''
-          mvn ${MVN_ARGS} \
-            -pl "${AFFECTED_MODULES}" -am \
-            verify \
-            -ff \
-            -DtrimStackTrace=true \
-            -Dsurefire.printSummary=true \
-            -Dfailsafe.printSummary=true
-        '''
+        script {
+          if (params.RUN_INTEGRATION_TESTS) {
+            sh '''
+              mvn ${MVN_ARGS} \
+                -pl "${AFFECTED_MODULES}" -am \
+                verify -Pintegration-tests \
+                -ff \
+                -DtrimStackTrace=true \
+                -Dsurefire.printSummary=true \
+                -Dfailsafe.printSummary=true
+            '''
+          } else {
+            sh '''
+              mvn ${MVN_ARGS} \
+                -pl "${AFFECTED_MODULES}" -am \
+                test \
+                -ff \
+                -DtrimStackTrace=true \
+                -Dsurefire.printSummary=true
+            '''
+          }
+        }
       }
       post {
         always {
