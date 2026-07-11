@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export DOCKER_BUILDKIT=0
+
 push_image_with_retry() {
   local image="$1"
   local attempt=1

@@ -16,7 +16,7 @@ pipeline {
 
   environment {
     MVN_ARGS = '-B -ntp'
-    DOCKER_BUILDKIT = '1'
+    DOCKER_BUILDKIT = '0'
     TESTCONTAINERS_RYUK_DISABLED = 'true'
     TESTCONTAINERS_HOST_OVERRIDE = 'host.docker.internal'
     DOCKERHUB_NAMESPACE = 'ynnhi2607'

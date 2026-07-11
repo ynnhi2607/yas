@@ -30,7 +30,6 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.Spy;
@@ -48,13 +47,11 @@ class MediaServiceUnitTest {
     @Mock
     private FileSystemRepository fileSystemRepository;
 
-    @Mock
-    private YasConfig yasConfig;
+    private final YasConfig yasConfig = new YasConfig("/media/");
 
     @Mock
     private MediaDtoBuilder builder;
 
-    @InjectMocks
     private MediaServiceImpl mediaService;
 
     private Media media;
@@ -62,6 +59,7 @@ class MediaServiceUnitTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        mediaService = new MediaServiceImpl(mediaVmMapper, mediaRepository, fileSystemRepository, yasConfig);
         media = new Media();
         media.setId(1L);
         media.setCaption("test");
@@ -73,7 +71,6 @@ class MediaServiceUnitTest {
     void getMedia_whenValidId_thenReturnData() {
         NoFileMediaVm noFileMediaVm = new NoFileMediaVm(1L, "Test", "fileName", "image/png");
         when(mediaRepository.findByIdWithoutFileInReturn(1L)).thenReturn(noFileMediaVm);
-        when(yasConfig.publicUrl()).thenReturn("/media/");
 
         MediaVm mediaVm = mediaService.getMediaById(1L);
         assertNotNull(mediaVm);
@@ -256,7 +253,6 @@ class MediaServiceUnitTest {
         var existingMedias = List.of(ip15, macbook);
         when(mediaRepository.findAllById(List.of(ip15.getId(), macbook.getId())))
             .thenReturn(existingMedias);
-        when(yasConfig.publicUrl()).thenReturn("https://media/");
 
         // When
         var medias = mediaService.getMediaByIds(List.of(ip15.getId(), macbook.getId()));
