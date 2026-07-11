@@ -42,10 +42,18 @@ pipeline {
       steps {
         sh 'bash jenkins/scripts/detect-changes.sh'
         script {
-          readFile('.jenkins-ci-env').split(/\r?\n/).findAll { it.trim() }.each { line ->
-            def parts = line.split('=', 2)
-            env[parts[0]] = parts.length > 1 ? parts[1] : ''
-          }
+          env.AFFECTED_MODULES = sh(
+            script: "grep '^AFFECTED_MODULES=' .jenkins-ci-env | cut -d= -f2-",
+            returnStdout: true
+          ).trim()
+          env.AFFECTED_DOCKER_MODULES = sh(
+            script: "grep '^AFFECTED_DOCKER_MODULES=' .jenkins-ci-env | cut -d= -f2-",
+            returnStdout: true
+          ).trim()
+          env.IMAGE_TAG = sh(
+            script: "grep '^IMAGE_TAG=' .jenkins-ci-env | cut -d= -f2-",
+            returnStdout: true
+          ).trim()
           currentBuild.description = "${env.BRANCH_NAME ?: ''} | ${env.AFFECTED_DOCKER_MODULES ?: 'no service changes'}"
         }
       }
