@@ -340,6 +340,7 @@ pipeline {
 
   environment {
     DOCKER_BUILDKIT = '0'
+    TESTCONTAINERS_RYUK_DISABLED = 'true'
   }
 
   stages {
