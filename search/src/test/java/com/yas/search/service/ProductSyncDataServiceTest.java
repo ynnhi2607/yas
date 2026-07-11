@@ -44,7 +44,7 @@ class ProductSyncDataServiceTest {
 
         productRepository = mock(ProductRepository.class);
         restClient = mock(RestClient.class);
-        serviceUrlConfig = mock(ServiceUrlConfig.class);
+        serviceUrlConfig = new ServiceUrlConfig(PRODUCT_URL);
         productSyncDataService = new ProductSyncDataService(restClient, serviceUrlConfig, productRepository);
         requestHeadersUriSpec = mock(RestClient.RequestHeadersUriSpec.class);
         responseSpec = mock(RestClient.ResponseSpec.class);
@@ -56,7 +56,6 @@ class ProductSyncDataServiceTest {
         final URI url = UriComponentsBuilder.fromUriString(PRODUCT_URL)
             .path("/storefront/products-es/{id}").buildAndExpand(ID).toUri();
 
-        when(serviceUrlConfig.product()).thenReturn(PRODUCT_URL);
         when(restClient.get()).thenReturn(requestHeadersUriSpec);
         when(requestHeadersUriSpec.uri(url)).thenReturn(requestHeadersUriSpec);
         when(requestHeadersUriSpec.retrieve()).thenReturn(responseSpec);
@@ -156,7 +155,6 @@ class ProductSyncDataServiceTest {
         URI url = UriComponentsBuilder.fromUriString(PRODUCT_URL)
             .path("/storefront/products-es/{id}").buildAndExpand(ID).toUri();
 
-        when(serviceUrlConfig.product()).thenReturn(PRODUCT_URL);
         when(restClient.get()).thenReturn(requestHeadersUriSpec);
         when(requestHeadersUriSpec.uri(url)).thenReturn(requestHeadersUriSpec);
         when(requestHeadersUriSpec.retrieve()).thenReturn(responseSpec);
