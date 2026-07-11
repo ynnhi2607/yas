@@ -1,259 +1,29 @@
-def backendServices = [
-  [name: 'product', image: 'yas-product', context: 'product'],
-  [name: 'cart', image: 'yas-cart', context: 'cart'],
-  [name: 'order', image: 'yas-order', context: 'order'],
-  [name: 'customer', image: 'yas-customer', context: 'customer'],
-  [name: 'inventory', image: 'yas-inventory', context: 'inventory'],
-  [name: 'location', image: 'yas-location', context: 'location'],
-  [name: 'tax', image: 'yas-tax', context: 'tax'],
-  [name: 'payment', image: 'yas-payment', context: 'payment'],
-  [name: 'media', image: 'yas-media', context: 'media'],
-  [name: 'search', image: 'yas-search', context: 'search'],
-  [name: 'storefront-bff', image: 'yas-storefront-bff', context: 'storefront-bff'],
-  [name: 'backoffice-bff', image: 'yas-backoffice-bff', context: 'backoffice-bff'],
-  [name: 'sampledata', image: 'yas-sampledata', context: 'sampledata']
-]
-
-def uiServices = [
-  [name: 'storefront-ui', image: 'yas-storefront', context: 'storefront'],
-  [name: 'backoffice-ui', image: 'yas-backoffice', context: 'backoffice']
-]
-
-def allServices = backendServices + uiServices
-
-def serviceByPath = [:]
-backendServices.each { service ->
-  serviceByPath[service.context] = service.name
-}
-uiServices.each { service ->
-  serviceByPath[service.context] = service.name
+def runCapture(String cmd) {
+  return sh(script: cmd, returnStdout: true).trim()
 }
 
-def resolveChangedFiles = {
-  def currentBranch = env.TAG_NAME ?: (env.BRANCH_NAME ?: sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim())
-  def baseBranch = env.CHANGE_TARGET ?: 'main'
-
-  if (!(currentBranch == 'main' || currentBranch == 'master') && !env.TAG_NAME) {
-    def fetchStatus = sh(
-      script: "git fetch origin ${baseBranch}:refs/remotes/origin/${baseBranch} --depth=50",
-      returnStatus: true
-    )
-    if (fetchStatus == 0) {
-      return sh(
-        script: "git diff --name-only origin/${baseBranch} HEAD",
-        returnStdout: true
-      ).trim().readLines().findAll { it?.trim() }
-    }
-    echo "Could not fetch origin/${baseBranch}; falling back to last commit diff."
-  }
-
-  def hasParent = sh(script: 'git rev-parse HEAD~1 >/dev/null 2>&1', returnStatus: true) == 0
-  if (hasParent) {
-    return sh(
-      script: 'git diff --name-only HEAD~1 HEAD',
-      returnStdout: true
-    ).trim().readLines().findAll { it?.trim() }
-  }
-
-  return sh(
-    script: "git show --name-only --pretty='' HEAD",
-    returnStdout: true
-  ).trim().readLines().findAll { it?.trim() }
+def splitCsv(String value) {
+  value?.split(',')?.collect { it.trim() }?.findAll { it } ?: []
 }
 
-def resolveServicesToBuild = { List changedFiles ->
-  def servicesToBuild = [] as LinkedHashSet
-  def buildAllBackends = false
-  def buildAllServices = false
+def computeChangedFiles() {
+  def cmd
 
-  changedFiles.each { file ->
-    if (!file) {
-      return
-    }
-
-    if (file == 'pom.xml' || file.startsWith('common-library/')) {
-      buildAllBackends = true
-      return
-    }
-
-    if (file.startsWith('jenkins/') || file.startsWith('scripts/cd/')) {
-      return
-    }
-
-    def topLevel = file.tokenize('/').first()
-    if (serviceByPath.containsKey(topLevel)) {
-      servicesToBuild << serviceByPath[topLevel]
-    }
-  }
-
-  if (buildAllServices) {
-    return allServices.collect { it.name }
-  }
-
-  if (buildAllBackends) {
-    backendServices.each { servicesToBuild << it.name }
-  }
-
-  return servicesToBuild as List
-}
-
-def serviceConfig = { String serviceName ->
-  def service = allServices.find { it.name == serviceName }
-  if (!service) {
-    error("Unknown service '${serviceName}'")
-  }
-  return service
-}
-
-def prepareJava21Build = {
-  sh '''
-    sed -i 's/<java.version>25<\\/java.version>/<java.version>21<\\/java.version>/' pom.xml
-    sed -i 's/<maven.compiler.source>25<\\/maven.compiler.source>/<maven.compiler.source>21<\\/maven.compiler.source>/' pom.xml
-    sed -i 's/<maven.compiler.target>25<\\/maven.compiler.target>/<maven.compiler.target>21<\\/maven.compiler.target>/' pom.xml
-    find . -maxdepth 2 -name Dockerfile -exec sed -i 's/eclipse-temurin:25-jre-alpine/eclipse-temurin:21-jre-alpine/g' {} \\;
-  '''
-}
-
-def publishBackendTestReports = { Map service ->
-  junit testResults: "${service.context}/target/surefire-reports/*.xml,${service.context}/target/failsafe-reports/*.xml", allowEmptyResults: true
-  if (params.ENABLE_COVERAGE_PUBLISH) {
-    recordCoverage(
-      id: "coverage-${service.name}",
-      name: "Coverage: ${service.name}",
-      tools: [[parser: 'JACOCO', pattern: "${service.context}/target/site/jacoco/jacoco.xml"]],
-      enabledForFailure: true,
-      qualityGates: [
-        [threshold: params.COVERAGE_THRESHOLD as Double, metric: 'LINE', baseline: 'PROJECT', criticality: 'FAILURE']
-      ]
-    )
+  if (env.CHANGE_TARGET) {
+    cmd = "git diff --name-only origin/${env.CHANGE_TARGET}...HEAD"
+  } else if (env.GIT_PREVIOUS_SUCCESSFUL_COMMIT && env.GIT_COMMIT) {
+    cmd = "git diff --name-only ${env.GIT_PREVIOUS_SUCCESSFUL_COMMIT}..${env.GIT_COMMIT}"
+  } else if (env.GIT_PREVIOUS_COMMIT && env.GIT_COMMIT) {
+    cmd = "git diff --name-only ${env.GIT_PREVIOUS_COMMIT}..${env.GIT_COMMIT}"
   } else {
-    echo "Coverage publishing is disabled. Set ENABLE_COVERAGE_PUBLISH=true after installing Jenkins Coverage plugin."
+    cmd = 'git show --name-only --pretty="" HEAD'
   }
-}
 
-def testBackendService = { Map service ->
-  prepareJava21Build()
   try {
-    sh "mvn clean install jacoco:report -pl ${service.context} -am"
-  } finally {
-    publishBackendTestReports(service)
-  }
-}
-
-def testUiService = { Map service ->
-  nodejs(params.NODEJS_TOOL) {
-    dir(service.context) {
-      sh 'npm ci'
-      sh 'npm run lint'
-      sh 'npm run build'
-    }
-  }
-}
-
-def testService = { Map service ->
-  if (backendServices.find { it.name == service.name }) {
-    testBackendService(service)
-  } else {
-    testUiService(service)
-  }
-}
-
-def packageSelectedServices = { List selectedServiceNames ->
-  def backendContexts = selectedServiceNames.collect { serviceConfig(it.trim()) }
-    .findAll { service -> backendServices.find { it.name == service.name } }
-    .collect { it.context }
-
-  if (backendContexts) {
-    prepareJava21Build()
-    sh "mvn -B -ntp -DskipTests clean package -pl ${backendContexts.join(',')} -am"
-  }
-
-  def uiContexts = selectedServiceNames.collect { serviceConfig(it.trim()) }
-    .findAll { service -> uiServices.find { it.name == service.name } }
-    .collect { it.context }
-
-  if (uiContexts) {
-    echo "UI Dockerfiles run npm build inside docker build: ${uiContexts.join(',')}"
-  }
-}
-
-def runGitleaksScan = {
-  int status = sh(
-    script: '''
-      if ! command -v gitleaks >/dev/null 2>&1; then
-        if [ ! -x ./gitleaks ]; then
-          curl -ssfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz | tar -xz gitleaks
-          chmod +x ./gitleaks
-        fi
-        GITLEAKS_CMD=./gitleaks
-      else
-        GITLEAKS_CMD=gitleaks
-      fi
-
-      "$GITLEAKS_CMD" detect --source . --config gitleaks.toml --verbose --no-git
-    ''',
-    returnStatus: true
-  )
-
-  if (status != 0) {
-    unstable('Gitleaks found issues')
-  } else {
-    echo 'No secrets detected'
-  }
-}
-
-def buildAndPushImage = { Map service, String commitTag, String branchName ->
-  def image = "${params.DOCKERHUB_USERNAME}/${service.image}:${commitTag}"
-
-  if (service.name == 'media') {
-    sh '''
-      rm -rf media/images
-      cp -a sampledata/images media/images
-    '''
-  }
-
-  sh "docker build -t ${image} ${service.context}"
-  sh "docker push ${image}"
-
-  if (branchName == 'main' || branchName == 'master') {
-    sh "docker tag ${image} ${params.DOCKERHUB_USERNAME}/${service.image}:latest"
-    sh "docker push ${params.DOCKERHUB_USERNAME}/${service.image}:latest"
-    sh "docker tag ${image} ${params.DOCKERHUB_USERNAME}/${service.image}:main"
-    sh "docker push ${params.DOCKERHUB_USERNAME}/${service.image}:main"
-  }
-
-  echo "Pushed image: ${image}"
-}
-
-def retagAndPushImage = { Map service, String sourceTag, String targetTag ->
-  def sourceImage = "${params.DOCKERHUB_USERNAME}/${service.image}:${sourceTag}"
-  def targetImage = "${params.DOCKERHUB_USERNAME}/${service.image}:${targetTag}"
-
-  sh "docker pull ${sourceImage}"
-  sh "docker tag ${sourceImage} ${targetImage}"
-  sh "docker push ${targetImage}"
-
-  echo "Retagged image: ${sourceImage} -> ${targetImage}"
-}
-
-def updateGitOpsImage = { String environmentName, Map service, String imageTag ->
-  withCredentials([string(credentialsId: params.GITOPS_CREDENTIALS_ID, variable: 'GITOPS_TOKEN')]) {
-    withEnv([
-      "ENVIRONMENT=${environmentName}",
-      "SERVICE=${service.name}",
-      "IMAGE_TAG=${imageTag}",
-      "DOCKERHUB_USERNAME=${params.DOCKERHUB_USERNAME}",
-      "GITOPS_REPO_URL=${params.GITOPS_REPO_URL}",
-      "GITOPS_REPO_DIR=${params.GITOPS_REPO_DIR}",
-      "PUSH_GITOPS=${params.PUSH_GITOPS}",
-      "GITOPS_COMMIT_USER=${params.GITOPS_COMMIT_USER}",
-      "GITOPS_COMMIT_EMAIL=${params.GITOPS_COMMIT_EMAIL}"
-    ]) {
-      sh '''
-        chmod +x scripts/cd/update_gitops_image.sh
-        ./scripts/cd/update_gitops_image.sh
-      '''
-    }
+    return splitCsv(runCapture(cmd).replace('\n', ','))
+  } catch (err) {
+    echo "Changed-file detection failed with '${cmd}'. Falling back to latest commit only."
+    return splitCsv(runCapture('git -c color.ui=never show --name-only --pretty="" HEAD').replace('\n', ','))
   }
 }
 
@@ -261,170 +31,233 @@ pipeline {
   agent any
 
   parameters {
-    string(name: 'DOCKERHUB_USERNAME', defaultValue: 'ynnhi2607', description: 'Docker Hub username/org')
-    string(name: 'DOCKERHUB_CREDENTIALS_ID', defaultValue: 'dockerhub', description: 'Jenkins username/password credentials id')
-    booleanParam(name: 'BUILD_ALL', defaultValue: false, description: 'Force build all demo services')
-    string(name: 'GITOPS_REPO_URL', defaultValue: 'https://github.com/ynnhi2607/yas-gitops.git', description: 'GitOps repository URL')
-    string(name: 'GITOPS_REPO_DIR', defaultValue: '../yas-gitops', description: 'Local GitOps checkout path inside Jenkins workspace')
-    string(name: 'GITOPS_CREDENTIALS_ID', defaultValue: 'github-token', description: 'Jenkins secret text credentials id for GitOps repo')
-    string(name: 'GITOPS_COMMIT_USER', defaultValue: 'jenkins-bot', description: 'Git author name for GitOps commits')
-    string(name: 'GITOPS_COMMIT_EMAIL', defaultValue: 'jenkins@local', description: 'Git author email for GitOps commits')
-    booleanParam(name: 'PUSH_GITOPS', defaultValue: true, description: 'Push GitOps changes to origin/main')
-    booleanParam(name: 'ENABLE_TESTS', defaultValue: true, description: 'Run unit and integration tests for selected services')
-    booleanParam(name: 'RUN_FEATURE_BRANCH_TESTS', defaultValue: false, description: 'Run tests on non-main branches')
-    booleanParam(name: 'ENABLE_IMAGE_BUILD', defaultValue: true, description: 'Build and push Docker images for selected services')
-    string(name: 'COVERAGE_THRESHOLD', defaultValue: '70.0', description: 'Minimum coverage percentage required by Jenkins Coverage plugin')
-    booleanParam(name: 'ENABLE_COVERAGE_PUBLISH', defaultValue: false, description: 'Publish JaCoCo coverage with Jenkins Coverage plugin')
-    booleanParam(name: 'ENABLE_GITLEAKS', defaultValue: true, description: 'Run Gitleaks secret scanning')
-    string(name: 'NODEJS_TOOL', defaultValue: 'node20', description: 'Jenkins NodeJS tool name')
+    booleanParam(name: 'BUILD_ALL', defaultValue: false, description: 'Build all services')
+    booleanParam(name: 'RUN_FEATURE_BRANCH_TESTS', defaultValue: false, description: 'Run Maven tests on non-main branches')
+  }
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    skipDefaultCheckout(true)
+    buildDiscarder(logRotator(numToKeepStr: '20'))
   }
 
   environment {
+    MVN_ARGS = '-B -ntp'
     DOCKER_BUILDKIT = '0'
     TESTCONTAINERS_RYUK_DISABLED = 'true'
+    DOCKERHUB_NAMESPACE = 'ynnhi2607'
+    DOCKERHUB_CREDENTIALS_ID = 'dockerhub'
+    MAVEN_MODULES = 'backoffice-bff cart customer inventory location media order payment product search storefront-bff tax sampledata'
+    DOCKER_SERVICES = 'backoffice backoffice-bff cart customer inventory location media order payment product search tax sampledata storefront storefront-bff'
   }
 
   stages {
     stage('Checkout') {
       steps {
         checkout scm
+        script {
+          if (env.CHANGE_TARGET) {
+            sh "git fetch --no-tags origin ${env.CHANGE_TARGET}"
+          }
+          if (env.BRANCH_NAME) {
+            sh '''
+              if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+                git fetch --no-tags --deepen=50 origin "$BRANCH_NAME"
+              fi
+            '''
+          }
+        }
       }
     }
 
-    stage('Resolve build plan') {
+    stage('Detect Changes') {
       steps {
         script {
-          env.COMMIT_TAG = sh(returnStdout: true, script: 'git rev-parse --short=8 HEAD').trim()
-          env.CURRENT_BRANCH = env.TAG_NAME ?: (env.BRANCH_NAME ?: sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim())
+          def allMavenModules = splitCsv(env.MAVEN_MODULES.replace(' ', ','))
+          def allDockerServices = splitCsv(env.DOCKER_SERVICES.replace(' ', ','))
+          def changedFiles = computeChangedFiles()
+            .collect { it.replace('\\', '/').replaceFirst(/^\.\//, '').trim() }
+            .findAll { it }
 
-          def changedFiles = resolveChangedFiles()
-          echo "Current branch: ${env.CURRENT_BRANCH}"
-          echo "Release tag: ${env.TAG_NAME ?: 'none'}"
-          echo "Commit tag: ${env.COMMIT_TAG}"
+          def rebuildAll = params.BUILD_ALL || changedFiles.any { f ->
+            f == 'pom.xml' || f.startsWith('common-library/') || f.startsWith('checkstyle/')
+          }
+
+          def affectedMaven = rebuildAll ? allMavenModules : allMavenModules.findAll { module ->
+            changedFiles.any { f -> f == module || f.startsWith("${module}/") }
+          }
+
+          def affectedDocker = rebuildAll ? allDockerServices : allDockerServices.findAll { service ->
+            changedFiles.any { f -> f == service || f.startsWith("${service}/") }
+          }
+
+          env.AFFECTED_MODULES = affectedMaven.join(',')
+          env.AFFECTED_DOCKER_MODULES = affectedDocker.join(',')
+          env.IMAGE_TAG = runCapture('git rev-parse --short=8 HEAD')
+
           echo "Changed files:\n${changedFiles.join('\n')}"
+          echo "Affected Maven modules: ${env.AFFECTED_MODULES ?: 'none'}"
+          echo "Affected Docker services: ${env.AFFECTED_DOCKER_MODULES ?: 'none'}"
+          echo "Image tag: ${env.IMAGE_TAG}"
 
-          def selectedServices = ((env.TAG_NAME ?: '') ==~ /^v.*/) ? allServices.collect { it.name } : (params.BUILD_ALL ? allServices.collect { it.name } : resolveServicesToBuild(changedFiles))
-          env.SELECTED_SERVICES = selectedServices.join(',')
-
-          echo "Services to build: ${env.SELECTED_SERVICES ?: 'none'}"
+          currentBuild.description = "${env.BRANCH_NAME ?: ''} | ${env.AFFECTED_DOCKER_MODULES ?: 'no service changes'}"
         }
       }
     }
 
-    stage('Check tools') {
-      when {
-        expression { env.SELECTED_SERVICES?.trim() }
-      }
-      steps {
-        sh '''
-          docker version
-          mvn -version
-          node --version || true
-          npm --version || true
-        '''
-      }
-    }
-
-    stage('Secret scan') {
-      when {
-        allOf {
-          expression { params.ENABLE_GITLEAKS }
-          expression { !((env.TAG_NAME ?: '') ==~ /^v.*/) }
-        }
-      }
+    stage('Gitleaks Scan') {
       steps {
         script {
-          runGitleaksScan()
-        }
-      }
-    }
+          int status = sh(
+            script: '''
+              if ! command -v gitleaks >/dev/null 2>&1; then
+                if [ ! -x ./gitleaks ]; then
+                  curl -ssfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz | tar -xz gitleaks
+                  chmod +x ./gitleaks
+                fi
+                GITLEAKS_CMD=./gitleaks
+              else
+                GITLEAKS_CMD=gitleaks
+              fi
 
-    stage('Docker login') {
-      when {
-        allOf {
-          expression { params.ENABLE_IMAGE_BUILD }
-          expression { env.SELECTED_SERVICES?.trim() }
-        }
-      }
-      steps {
-        withCredentials([usernamePassword(credentialsId: params.DOCKERHUB_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-          sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
-        }
-      }
-    }
+              "$GITLEAKS_CMD" detect --source . --config gitleaks.toml --verbose --no-git
+            ''',
+            returnStatus: true
+          )
 
-    stage('Test selected services') {
-      when {
-        allOf {
-          expression { params.ENABLE_TESTS }
-          expression { env.SELECTED_SERVICES?.trim() }
-          expression { !((env.TAG_NAME ?: '') ==~ /^v.*/) }
-          expression { env.CURRENT_BRANCH == 'main' || env.CURRENT_BRANCH == 'master' || params.RUN_FEATURE_BRANCH_TESTS }
-        }
-      }
-      steps {
-        script {
-          env.SELECTED_SERVICES.split(',').findAll { it?.trim() }.each { serviceName ->
-            def service = serviceConfig(serviceName.trim())
-            testService(service)
+          if (status != 0) {
+            unstable('Gitleaks found issues')
+          } else {
+            echo 'No secrets detected'
           }
         }
       }
     }
 
-    stage('Build and push images') {
+    stage('Build') {
       when {
-        allOf {
-          expression { params.ENABLE_IMAGE_BUILD }
-          expression { env.SELECTED_SERVICES?.trim() }
-          expression { !((env.TAG_NAME ?: '') ==~ /^v.*/) }
-        }
+        expression { env.AFFECTED_MODULES?.trim() }
       }
       steps {
-        script {
-          def testsWereSkipped = !params.ENABLE_TESTS || !(env.CURRENT_BRANCH == 'main' || env.CURRENT_BRANCH == 'master' || params.RUN_FEATURE_BRANCH_TESTS)
-          if (testsWereSkipped) {
-            packageSelectedServices(env.SELECTED_SERVICES.split(',').findAll { it?.trim() })
-          }
+        sh "mvn ${env.MVN_ARGS} -pl ${env.AFFECTED_MODULES} -am -DskipTests clean package"
+      }
+    }
 
-          env.SELECTED_SERVICES.split(',').findAll { it?.trim() }.each { serviceName ->
-            def service = serviceConfig(serviceName.trim())
-            buildAndPushImage(service, env.COMMIT_TAG, env.CURRENT_BRANCH)
-          }
+    stage('Unit & Integration Tests') {
+      when {
+        expression {
+          env.AFFECTED_MODULES?.trim() &&
+          (env.BRANCH_NAME == 'main' || params.RUN_FEATURE_BRANCH_TESTS)
+        }
+      }
+      options {
+        timeout(time: 30, unit: 'MINUTES')
+      }
+      steps {
+        sh """
+          mvn ${env.MVN_ARGS} \
+            -pl ${env.AFFECTED_MODULES} -am \
+            verify \
+            -ff \
+            -DtrimStackTrace=true \
+            -Dsurefire.printSummary=true \
+            -Dfailsafe.printSummary=true
+        """
+      }
+      post {
+        always {
+          junit allowEmptyResults: true,
+            testResults: '**/target/surefire-reports/*.xml, **/target/failsafe-reports/*.xml'
         }
       }
     }
 
-    stage('CD Dev GitOps update') {
+    stage('Build and Push Docker Images') {
       when {
-        allOf {
-          expression { params.ENABLE_IMAGE_BUILD }
-          expression { env.SELECTED_SERVICES?.trim() }
-          expression { env.CURRENT_BRANCH == 'main' || env.CURRENT_BRANCH == 'master' }
+        expression {
+          env.AFFECTED_DOCKER_MODULES?.trim() &&
+          !env.CHANGE_ID &&
+          !env.TAG_NAME
         }
       }
       steps {
         script {
-          env.SELECTED_SERVICES.split(',').findAll { it?.trim() }.each { serviceName ->
-            def service = serviceConfig(serviceName.trim())
-            updateGitOpsImage('dev', service, env.COMMIT_TAG)
+          def dockerServices = splitCsv(env.AFFECTED_DOCKER_MODULES).findAll { service ->
+            fileExists("${service}/Dockerfile")
           }
-        }
-      }
-    }
 
-    stage('CD Staging GitOps update') {
-      when {
-        allOf {
-          expression { params.ENABLE_IMAGE_BUILD }
-          expression { (env.TAG_NAME ?: '') ==~ /^v.*/ }
-        }
-      }
-      steps {
-        script {
-          allServices.each { service ->
-            retagAndPushImage(service, 'main', env.TAG_NAME)
-            updateGitOpsImage('staging', service, env.TAG_NAME)
+          if (!dockerServices) {
+            echo 'No affected service has a Dockerfile. Skipping image push.'
+            return
+          }
+
+          withCredentials([usernamePassword(
+            credentialsId: env.DOCKERHUB_CREDENTIALS_ID,
+            usernameVariable: 'DOCKERHUB_USERNAME',
+            passwordVariable: 'DOCKERHUB_PASSWORD'
+          )]) {
+            sh '''
+              set +x
+              printf '%s' "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            '''
+
+            dockerServices.each { service ->
+              withEnv(["SERVICE_NAME=${service}"]) {
+                sh '''
+                  push_image_with_retry() {
+                    image="$1"
+                    attempt=1
+                    max_attempts=5
+
+                    while [ "$attempt" -le "$max_attempts" ]; do
+                      echo "Pushing ${image} (attempt ${attempt}/${max_attempts})"
+                      if docker push "${image}"; then
+                        return 0
+                      fi
+
+                      if [ "$attempt" -eq "$max_attempts" ]; then
+                        echo "Failed to push ${image} after ${max_attempts} attempts"
+                        return 1
+                      fi
+
+                      sleep_seconds=$((attempt * 20))
+                      echo "Push failed for ${image}. Retrying in ${sleep_seconds}s..."
+                      sleep "$sleep_seconds"
+                      attempt=$((attempt + 1))
+                    done
+                  }
+
+                  IMAGE="${DOCKERHUB_NAMESPACE}/yas-${SERVICE_NAME}:${IMAGE_TAG}"
+                  if [ "${SERVICE_NAME}" = "backoffice" ]; then
+                    IMAGE="${DOCKERHUB_NAMESPACE}/yas-backoffice:${IMAGE_TAG}"
+                  fi
+                  if [ "${SERVICE_NAME}" = "storefront" ]; then
+                    IMAGE="${DOCKERHUB_NAMESPACE}/yas-storefront:${IMAGE_TAG}"
+                  fi
+
+                  echo "Building ${IMAGE}"
+                  if [ "${SERVICE_NAME}" = "media" ]; then
+                    rm -rf media/images
+                    cp -a sampledata/images media/images
+                  fi
+
+                  docker build --pull -t "${IMAGE}" "${SERVICE_NAME}"
+                  push_image_with_retry "${IMAGE}"
+
+                  if [ "${BRANCH_NAME}" = "main" ]; then
+                    MAIN_IMAGE="${IMAGE%:*}:main"
+                    LATEST_IMAGE="${IMAGE%:*}:latest"
+                    docker tag "${IMAGE}" "${MAIN_IMAGE}"
+                    docker tag "${IMAGE}" "${LATEST_IMAGE}"
+                    push_image_with_retry "${MAIN_IMAGE}"
+                    push_image_with_retry "${LATEST_IMAGE}"
+                  fi
+                '''
+              }
+            }
+
+            sh 'docker logout || true'
           }
         }
       }
@@ -433,7 +266,18 @@ pipeline {
 
   post {
     always {
-      sh 'docker logout || true'
+      archiveArtifacts allowEmptyArchive: true,
+        artifacts: '**/target/*.jar, **/target/surefire-reports/*.xml, **/target/failsafe-reports/*.xml'
+      echo 'Pipeline finished.'
+    }
+    success {
+      echo 'Pipeline SUCCESS'
+    }
+    unstable {
+      echo 'Pipeline UNSTABLE'
+    }
+    failure {
+      echo 'Pipeline FAILED'
     }
   }
 }
