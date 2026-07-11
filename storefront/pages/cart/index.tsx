@@ -197,6 +197,11 @@ const Cart = () => {
   };
 
   const handleCheckout = () => {
+    if (!email) {
+      toastError('Please login to checkout!');
+      return;
+    }
+
     const selectedItems = getSelectedCartItems();
     const checkoutItems = selectedItems.map((item) => convertItemToCheckoutItem(item));
 

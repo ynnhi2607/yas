@@ -22,6 +22,7 @@ helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
   --set grafana.ingress.hosts[0]="grafana.${DOMAIN}" \
   --set grafana.adminUser="${GRAFANA_USERNAME}" \
   --set grafana.adminPassword="${GRAFANA_PASSWORD}" \
+  --set grafana.assertNoLeakedSecrets=false \
   --set grafana.grafana\\.ini.database.user="${POSTGRESQL_USERNAME}" \
   --set grafana.grafana\\.ini.database.password="${POSTGRESQL_PASSWORD}"
 

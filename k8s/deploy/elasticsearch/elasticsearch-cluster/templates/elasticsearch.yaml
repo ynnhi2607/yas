@@ -16,4 +16,3 @@ spec:
       count: {{ .Values.elasticsearch.replicas }}
       config:
         node.store.allow_mmap: false
-        readiness.port: 9200

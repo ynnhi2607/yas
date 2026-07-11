@@ -24,6 +24,7 @@ import { initPaymentPaypal } from '@/modules/paymentPaypal/services/PaymentPaypa
 import { InitPaymentPaypalRequest } from '@/modules/paymentPaypal/models/InitPaymentPaypalRequest';
 import SpinnerComponent from '@/common/components/SpinnerComponent';
 import { getAddress } from '@/modules/address/services/AddressService';
+import { useUserInfoContext } from '@/context/UserInfoContext';
 
 const phoneRegExp =
   /^((\+[1-9]{1,4}[ -]*)|(\([0-9]{2,3}\)[ -]*)|[0-9]{2,4}[ -]*)?[0-9]{3,4}?[ -]*[0-9]{3,4}?$/;
@@ -40,6 +41,7 @@ const addressSchema = yup.object().shape({
 const Checkout = () => {
   const router = useRouter();
   const { id } = router.query;
+  const { email: userEmail } = useUserInfoContext();
   const [checkout, setCheckout] = useState<CheckoutVm>();
   const {
     handleSubmit,
@@ -216,7 +218,11 @@ const Checkout = () => {
     order.paymentMethod = paymentMethod;
 
     order.checkoutId = id as string;
-    order.email = checkout?.email!;
+    order.email = checkout?.email || data.email || userEmail;
+    if (!order.email) {
+      toast.error('Please login to checkout!');
+      return;
+    }
     order.note = data.note;
     order.tax = 0;
     order.discount = checkout?.totalDiscountAmount;
